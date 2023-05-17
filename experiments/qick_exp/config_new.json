@@ -1,0 +1,45 @@
+{"device": {
+    "soc": {
+    "resonator": {
+        "ch": 4,
+        "nyqist": 1,
+        "res_phase": 0,
+        "gain": 2000,
+        "freq": 186.941860258892,
+        "phase": 0
+    },
+    "readout": {
+        "ch": [0],
+        "nyqist": 1,
+        "length": 5,
+        "readout_length": 1,
+        "adc_trig_offset": 60,
+        "lo": 7100,
+        "relax_delay": 50,
+        "freq": 186.941860258892,
+        "phase": 0
+    },
+    "qubit": {
+        "ch": 6,
+        "nyqist": 1,
+        "f_ge": 4265.424523771228,
+        "f_ef": 4101.630947496188,
+        "pulses": {
+            "pi_ge": {
+                "gain": 2400,
+                "sigma": 0.2393
+            },
+            "pi2_ge": {
+                "gain": 2400,
+                "sigma": 0.11965
+            }
+
+        }
+    }
+    }
+},
+"aliases": {
+    "soc": "myqick",
+    "readout_lo": "MXG1"
+}
+}
