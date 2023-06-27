@@ -60,6 +60,7 @@ class AmplitudeRabiEFProgram(RAveragerProgram):
     def body(self):
         cfg = AttrDict(self.cfg)
         if cfg.expt.pi_qubit:
+            #applying a pi pulse to go to e state of qubit
             self.set_pulse_registers(
                 ch=self.qubit_ch,
                 style="arb",
