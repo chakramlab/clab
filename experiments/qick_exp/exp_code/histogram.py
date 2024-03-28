@@ -45,14 +45,31 @@ class HistogramProgram(RAveragerProgram):
                                  freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
 
         # add qubit and readout pulses to respective channels
-        self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.pisigma, length=self.pisigma * 4)
-        self.set_pulse_registers(
-            ch=self.qubit_ch,
-            style="arb",
-            freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-            phase=self.deg2reg(0),
-            gain=0,
-            waveform="qubit")
+
+        self.qubit_pulse_type = self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type
+
+        if self.qubit_pulse_type == "gauss":
+            print('Pulse type: gauss')
+            self.add_gauss(ch=self.qubit_ch, name="qubit_pi", sigma=self.pisigma, length=self.pisigma * 4)
+            self.set_pulse_registers(
+                            ch=self.qubit_ch,
+                            style="arb",
+                            freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                            phase=self.deg2reg(0),
+                            gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                            waveform="qubit_pi")
+            
+        elif self.qubit_pulse_type == "const":
+            print('Pulse type: const')
+            self.set_pulse_registers(
+                            ch=self.qubit_ch,
+                            style="const",
+                            freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                            phase=self.deg2reg(0),
+                            gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                            length=self.pisigma)
+            
+    
         self.set_pulse_registers(
             ch=self.res_ch,
             style="const",
@@ -99,8 +116,18 @@ class HistogramExperiment(Experiment):
         expt =  {"reps": 10000}
     """
 
-    def __init__(self, path='', prefix='Histogram', config_file=None, progress=None):
+    def __init__(self, path='', prefix='Histogram', config_file=None, progress=None, datapath=None, filename=None):
         super().__init__(path=path, prefix=prefix, config_file=config_file, progress=progress)
+
+        if datapath is None:
+            self.datapath = None
+        else:
+            self.datapath = datapath
+
+        if filename is None:
+            self.filename = None
+        else: 
+            self.filename = filename
 
     def acquire(self, progress=False, debug=False):
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
@@ -116,7 +143,12 @@ class HistogramExperiment(Experiment):
         self.data['q0'] = q0
         self.data['i1'] = i1
         self.data['q1'] = q1
-        return data
+
+        data_dict = {'ig': i0[0], 'qg': q0[0], 'ie': i0[1], 'qe': q0[1]}
+
+        if self.datapath and self.filename:
+            self.save_data(data_path=self.datapath, filename=self.filename, arrays=data_dict)
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:

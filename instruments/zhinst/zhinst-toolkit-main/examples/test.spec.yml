@@ -1,0 +1,78 @@
+active_qubit_reset:
+  skip: True
+
+awg:
+  device_type: "HDAWG8"
+
+bell_state_stabilization:
+  skip: True
+
+daq_module:
+  device_type: ["MFLI", "UHFLI"]
+
+device_settings_module:
+  device_type: ["MFLI", "UHFLI", "UHFQA", "HDAWG8", "SHFSG4"]
+
+hdawg_grouped_mode:
+  device_type: "HDAWG8"
+
+hdawg_precomp_curve_fit:
+  device_type: "HDAWG8"
+
+hf2:
+  device_type: "HF2LI"
+
+impedance_module:
+  device_type: "MFIA"
+
+nodetree:
+  device_type: ["MFLI", "UHFLI"]
+
+pid_advisor_module:
+  device_type: ["MFLI"]
+
+repeat_until_success:
+  skip: True
+
+scope_module:
+  device_type: ["MFLI", "UHFLI"]
+
+shfqa_multistate_discrimination:
+  device_type: "SHFQA2"
+
+shfqa_qubit_readout_measurement:
+  device_type: "SHFQA2"
+
+shfqa_qubit_readout_weights:
+  device_type: "SHFQA2"
+
+shfqa_sweeper:
+  device_type: "SHFQA2"
+
+shfqa_shfqc_power_spectral_density:
+  device_type: "SHFQA2"
+
+shfqc_propagation_delay:
+  # device_type: "SHFQC"
+  skip: True
+
+shfqc_qubit_spectroscopy:
+  device_type: "SHFQC"
+
+shfqc_resonator_spectroscopy_cw:
+  device_type: "SHFQC"
+
+shfsg_rabi:
+  device_type: "SHFSG4"
+
+shfsg_sine:
+  device_type: "SHFSG4"
+
+sweeper_module:
+  device_type: ["MFLI", "UHFLI"]
+
+uhf_boxcar:
+  device_type: "UHFLI"
+
+uhfqa_result_unit:
+  device_type: "UHFQA"

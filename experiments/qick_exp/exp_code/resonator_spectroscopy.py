@@ -7,62 +7,6 @@ from slab import SlabFile
 from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
-# class LoopbackProgram(AveragerProgram):
-#     def initialize(self):
-#         cfg=self.cfg   
-#         res_ch = cfg["res_ch"]
-
-#         # set the nyquist zone
-#         self.declare_gen(ch=cfg["res_ch"], nqz=1)
-        
-#         # configure the readout lengths and downconversion frequencies (ensuring it is an available DAC frequency)
-#         for ch in cfg["ro_chs"]:
-#             self.declare_readout(ch=ch, length=self.cfg["readout_length"],
-#                                  freq=self.cfg["pulse_freq"], gen_ch=cfg["res_ch"])
-
-#         # convert frequency to DAC frequency (ensuring it is an available ADC frequency)
-#         freq = self.freq2reg(cfg["pulse_freq"],gen_ch=res_ch, ro_ch=cfg["ro_chs"][0])
-#         phase = self.deg2reg(cfg["res_phase"], gen_ch=res_ch)
-#         gain = cfg["pulse_gain"]
-#         self.default_pulse_registers(ch=res_ch, freq=freq, phase=phase, gain=gain)
-
-#         style=self.cfg["pulse_style"]
-
-#         if style in ["flat_top","arb"]:
-#             sigma = cfg["sigma"]
-#             self.add_gauss(ch=res_ch, name="measure", sigma=sigma, length=sigma*5)
-            
-#         if style == "const":
-#             self.set_pulse_registers(ch=res_ch, style=style, length=cfg["length"])
-#         elif style == "flat_top":
-#             # The first half of the waveform ramps up the pulse, the second half ramps down the pulse
-#             self.set_pulse_registers(ch=res_ch, style=style, waveform="measure", length=cfg["length"])
-#         elif style == "arb":
-#             self.set_pulse_registers(ch=res_ch, style=style, waveform="measure")
-        
-#         self.synci(200)  # give processor some time to configure pulses
-    
-#     def body(self):
-#         # fire the pulse
-#         # trigger all declared ADCs
-#         # pulse PMOD0_0 for a scope trigger
-#         # pause the tProc until readout is done
-#         # increment the time counter to give some time before the next measurement
-#         # (the syncdelay also lets the tProc get back ahead of the clock)
-#         self.measure(pulse_ch=self.cfg["res_ch"], 
-#                      adcs=self.ro_chs,
-#                      pins=[0], 
-#                      adc_trig_offset=self.cfg["adc_trig_offset"],
-#                      wait=True,
-#                      syncdelay=self.us2cycles(self.cfg["relax_delay"]))
-        
-#         # equivalent to the following:
-# #         self.trigger(adcs=self.ro_chs,
-# #                      pins=[0], 
-# #                      adc_trig_offset=self.cfg["adc_trig_offset"])
-# #         self.pulse(ch=self.cfg["res_ch"])
-# #         self.wait_all()
-# #         self.sync_all(self.us2cycles(self.cfg["relax_delay"]))
 
 class ResonatorSpectroscopyProgram(AveragerProgram):
     def initialize(self):
@@ -73,12 +17,12 @@ class ResonatorSpectroscopyProgram(AveragerProgram):
         
         ############param
         self.res_ch= cfg.device.soc.resonator.ch
-        self.readout_length = self.us2cycles(cfg.device.soc.readout.length)
-        self.res_freq = cfg.device.soc.resonator.freq
+        self.res_freq = self.cfg.expt.length_placeholder
         self.res_gain = cfg.device.soc.resonator.gain
         self.readout_ch = cfg.device.soc.readout.ch
         self.adc_trig_offset = cfg.device.soc.readout.adc_trig_offset
         self.relax_delay = self.us2cycles(cfg.device.soc.readout.relax_delay)
+        self.readout_length = self.us2cycles(cfg.device.soc.readout.length, ro_ch=self.readout_ch[0])
         #################
         #print(self.res_freq)
 
@@ -103,13 +47,50 @@ class ResonatorSpectroscopyProgram(AveragerProgram):
             gain=self.res_gain, 
             length=self.readout_length)
 
-        self.synci(200)  # give processor some time to configure pulses
+        ### Qubit pi-pulse before readout
+
+        self.qubit_pulse_type = self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type
+        self.qubit_ch = cfg.device.soc.qubit.ch
+        self.q_rp=self.ch_page(self.qubit_ch)     # get register page for qubit_ch
+        self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
+        self.pi_ge_sigma = self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
+
+        if self.qubit_pulse_type == "gauss":
+            print('Pulse type: gauss')
+            self.add_gauss(ch=self.qubit_ch, name="qubit_pi", sigma=self.pi_ge_sigma, length=self.pi_ge_sigma * 4)
+            self.set_pulse_registers(
+                            ch=self.qubit_ch,
+                            style="arb",
+                            freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                            phase=self.deg2reg(0),
+                            gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                            waveform="qubit_pi")
+            
+        elif self.qubit_pulse_type == "const":
+            print('Pulse type: const')
+            self.set_pulse_registers(
+                            ch=self.qubit_ch,
+                            style="const",
+                            freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                            phase=self.deg2reg(0),
+                            gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                            length=self.pi_ge_sigma)
+
+        self.sync_all(self.us2cycles(0.2))  # give processor some time to configure pulses
     
     def body(self):
         cfg=AttrDict(self.cfg)
         # soc = self.cfg.soc
         # soc = self.im[self.cfg.aliases.soc]
-        self.measure(pulse_ch=self.res_ch, 
+
+        if cfg.expt.ge_pi_before:
+            print('Running pi-pulse before readout')
+    
+            self.pulse(ch=self.qubit_ch)
+            self.sync_all()
+
+        self.measure(
+             pulse_ch=self.res_ch, 
              adcs=self.readout_ch,
              pins = [0],
              adc_trig_offset=self.adc_trig_offset,
@@ -127,47 +108,23 @@ class ResonatorSpectroscopyExperiment(Experiment):
         } 
     """
 
-    def __init__(self, path='', prefix='ResonatorSpectroscopy', config_file=None, progress=None):
+    def __init__(self, path='', prefix='ResonatorSpectroscopy', config_file=None, progress=None, datapath = None,filename = None):
         super().__init__(path=path,prefix=prefix, config_file=config_file, progress=progress)
-
-        #for debuggging 
-        # config={"res_ch":6, # --Fixed
-        # "ro_chs":[0,1], # --Fixed
-        # "reps":1, # --Fixed
-        # "relax_delay":1.0, # --us
-        # "res_phase":0, # --degrees
-        # "pulse_style": "const", # --Fixed
         
-        # "length":20, # [Clock ticks]
-        # # Try varying length from 10-100 clock ticks
+        if datapath is None:
+            self.datapath = self.path + '\\data'
+        else:
+            self.datapath = datapath
         
-        # "readout_length":100, # [Clock ticks]
-        # # Try varying readout_length from 50-1000 clock ticks
+        if filename is None:
+            self.filename = self.prefix
+        else: 
+            self.filename = filename
+        
 
-        # "pulse_gain":3000, # [DAC units]
-        # # Try varying pulse_gain from 500 to 30000 DAC units
-
-        # "pulse_freq": 3, # [MHz]
-        # # In this program the signal is up and downconverted digitally so you won't see any frequency
-        # # components in the I/Q traces below. But since the signal gain depends on frequency, 
-        # # if you lower pulse_freq you will see an increased gain.
-
-        # "adc_trig_offset": 100, # [Clock ticks]
-        # # Try varying adc_trig_offset from 100 to 220 clock ticks
-
-        # "soft_avgs":100
-        # # Try varying soft_avgs from 1 to 200 averages
-
-        #  }
-        #print(self.cfg)
-        #self.cfg.update(config)
-        #print(self.cfg)
-        #soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-        #self.prog= LoopbackProgram(soc, self.cfg)
-        #self.prog= ResonatorSpectroscopyProgram(soc, self.cfg)
         print('Successfully Initialized')
 
-    def acquire(self, progress=False, data_path=None, filename=None):
+    def acquire(self, data_path=None, filename=None, progress=False):
         fpts=self.cfg.expt["start"] + self.cfg.expt["step"]*np.arange(self.cfg.expt["expts"])
         data={"fpts":[], "avgi":[], "avgq":[], "amps":[], "phases":[]}
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
@@ -177,7 +134,7 @@ class ResonatorSpectroscopyExperiment(Experiment):
         
         for f in tqdm(fpts, disable = not progress):
             #print('inside res spec for loop')
-            self.cfg.device.soc.resonator.freq = int(f)
+            self.cfg.expt.length_placeholder = f
             #print(self.cfg.device.resonator.freq)
             #prog = ResonatorSpectroscopyProgram(soc, self.cfg)
             self.prog= ResonatorSpectroscopyProgram(soc, self.cfg)
@@ -214,9 +171,11 @@ class ResonatorSpectroscopyExperiment(Experiment):
         #     print("File saved at", file_path)
 
         data_dict = {"xpts":fpts, "avgq":avgq_col, "avgi":avgi_col}
+
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
-        # return data
+
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:

@@ -19,7 +19,7 @@ class T1Program(RAveragerProgram):
         self.r_wait = 3
         self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
         
-        self.f_res=self.freq2reg(cfg.device.soc.resonator.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
+        self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
         # self.cfg["adc_freqs"]=[adcfreq(cfg.device.soc.readout.frequency)]*2   #add frequency of adc ddc to config
@@ -32,18 +32,36 @@ class T1Program(RAveragerProgram):
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.resonator.freq, gen_ch=self.res_ch)
+                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
 
 
         # add qubit and readout pulses to respective channels
-        self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.pisigma, length=self.pisigma * 4)
-        self.set_pulse_registers(
-            ch=self.qubit_ch,
-            style="arb",
-            freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-            phase=self.deg2reg(0),
-            gain=cfg.device.soc.qubit.pulses.pi_ge.gain,
-            waveform="qubit")
+        try: pulse_type = cfg.device.soc.qubit.pulses.pi_ge.pulse_type
+        except: pulse_type = 'const'
+        
+        print ("pulse type = ",pulse_type)
+
+        if pulse_type == 'const':
+
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                phase=0,
+                gain=cfg.device.soc.qubit.pulses.pi_ge.gain, 
+                length=self.pisigma)
+            
+        elif pulse_type == 'gauss':
+
+            self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.pisigma, length=self.pisigma * 4)
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                phase=self.deg2reg(0),
+                gain=cfg.device.soc.qubit.pulses.pi_ge.gain,
+                waveform="qubit")
+            
         self.set_pulse_registers(
             ch=self.res_ch,
             style="const",
@@ -77,16 +95,23 @@ class T1Experiment(Experiment):
 
     def __init__(self, path='', prefix='T1', config_file=None, progress=None):
         super().__init__(path=path,prefix=prefix, config_file=config_file, progress=progress)
-    def acquire(self, progress=False, debug=False, data_path=None, filename=None):
+
+    def acquire(self, progress=False, debug=False, data_path=None, filename=None, prob_calib=True):
+
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         t1 = T1Program(soc, self.cfg)
-        x_pts, avgi, avgq = t1.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
+        xpts, avgi, avgq = t1.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
         
-        data={'xpts': x_pts, 'avgi':avgi, 'avgq':avgq}
-        
+        data={'xpts': xpts, 'avgi':avgi, 'avgq':avgq}
         self.data=data
 
-        data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
+        if prob_calib:
+            # Calibrate qubit probability
+            iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+            i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+            data_dict = {'xpts': xpts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        else:
+            data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
 
         if data_path and filename:
             self.save_data(data_path, filename, arrays=data_dict)

@@ -14,10 +14,9 @@ class LengthRabiProgram(AveragerProgram):
         self.qubit_ch = cfg.device.soc.qubit.ch
         
         self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
-        self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
+        # self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
         
-        print(self.res_ch)
-        self.f_res=self.freq2reg(self.cfg.device.soc.resonator.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
+        self.f_res=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
         self.readout_length= self.us2cycles(self.cfg.device.soc.readout.length)
  
 
@@ -30,7 +29,7 @@ class LengthRabiProgram(AveragerProgram):
 
         for ch in [0]:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.resonator.freq, gen_ch=self.res_ch)
+                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
         
         # add qubit and readout pulses to respective channels
         if self.cfg.expt.pulse_type.lower() == "gauss" and self.sigma_test > 0:
@@ -92,7 +91,7 @@ class LengthRabiExperiment(Experiment):
     def __init__(self, path='', prefix='LengthRabi', config_file=None, progress=None):
         super().__init__(path=path,prefix=prefix, config_file=config_file, progress=progress)
 
-    def acquire(self, progress=False, data_path=None, filename=None):
+    def acquire(self, progress=False, data_path=None, filename=None, prob_calib=True):
         lengths = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         data={"xpts":[], "avgi":[], "avgq":[], "amps":[], "phases":[]}
@@ -116,7 +115,18 @@ class LengthRabiExperiment(Experiment):
 
         avgq_col = np.array([data['avgq'][i][0][0] for i in np.arange(len(data['avgq']))])
         avgi_col = np.array([data['avgi'][i][0][0] for i in np.arange(len(data['avgi']))])
-        data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col}
+
+        if prob_calib:
+
+            # Calibrate qubit probability
+
+            iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+            i_prob, q_prob = self.get_qubit_prob(avgi_col, avgq_col, iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+            data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col, 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        
+        else:
+
+            data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col}
 
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)

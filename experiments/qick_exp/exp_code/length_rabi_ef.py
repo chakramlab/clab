@@ -20,7 +20,7 @@ class LengthRabiEFProgram(AveragerProgram):
             self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
             self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch
 
-            self.f_res=self.freq2reg(self.cfg.device.soc.resonator.freq, gen_ch=self.res_ch, ro_ch=self.cfg.device.soc.readout.ch[0]) # convert f_res to dac register value
+            self.f_res=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=self.cfg.device.soc.readout.ch[0]) # convert f_res to dac register value
             self.readout_length= self.us2cycles(self.cfg.device.soc.readout.readout_length)
 
             self.sigma_test = self.us2cycles(self.cfg.expt.length_placeholder)
@@ -34,12 +34,13 @@ class LengthRabiEFProgram(AveragerProgram):
 
             for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
                 self.declare_readout(ch=ch, length=self.readout_length,
-                                     freq=cfg.device.soc.resonator.freq, gen_ch=self.res_ch)
+                                     freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
 
-
-            # add qubit and readout pulses to respective channels
             self.add_gauss(ch=self.qubit_ch, name="qubit_pi", sigma=self.pi_ge_sigma, length=self.pi_ge_sigma * 4)
-            # self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_test, length=self.sigma_test * 4)
+            self.add_gauss(ch=self.qubit_ch, name="pi_ef", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma) * 4)
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_test, length=self.sigma_test * 4)
+
+
             self.set_pulse_registers(
                 ch=self.res_ch,
                 style="const",
@@ -53,19 +54,37 @@ class LengthRabiEFProgram(AveragerProgram):
 
     def body(self):
         cfg=AttrDict(self.cfg)
-        if cfg.expt.pi_qubit:
-            #print('hi')
-            self.set_pulse_registers(
-                ch=self.qubit_ch,
-                style="arb",
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-                phase=self.deg2reg(0),
-                gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
-                waveform="qubit_pi")
-            self.pulse(ch=self.qubit_ch)
-            self.sync_all()
 
-        if self.cfg.expt.length_placeholder > 0:
+        # pi_ge
+
+        if cfg.expt.pi_qubit:
+            if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'const':
+
+                self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                    phase=0,
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
+                    length=self.pi_ge_sigma)
+                
+            if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+
+                self.set_pulse_registers(
+                    ch=self.qubit_ch,
+                    style="arb",
+                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                    phase=self.deg2reg(0),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                    waveform="qubit_pi")
+                
+            self.pulse(ch=self.qubit_ch)
+            self.sync_all()            
+
+        # pi_ef
+            
+        if self.cfg.expt.pulse_type == 'const':
+
             self.set_pulse_registers(
                 ch=self.qubit_ch,
                 style="const",
@@ -73,18 +92,75 @@ class LengthRabiEFProgram(AveragerProgram):
                 phase=self.deg2reg(0),
                 gain=self.cfg.expt.gain,
                 length=self.sigma_test)
+        
+        if self.cfg.expt.pulse_type == 'gauss':
+
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+                phase=self.deg2reg(0),
+                gain=self.cfg.expt.gain,
+                waveform="qubit_ef")
+
+        self.pulse(ch=self.qubit_ch)
+        self.sync_all()
+
+        # pi_ge
+
+        if cfg.expt.pi_ge_after:
+
+            if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'const':
+
+                self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                    phase=0,
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
+                    length=self.pi_ge_sigma)
+                
+            if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+
+                
+                self.set_pulse_registers(
+                    ch=self.qubit_ch,
+                    style="arb",
+                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                    phase=self.deg2reg(0),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                    waveform="qubit_pi")
+            
+            self.pulse(ch=self.qubit_ch)
+            self.sync_all()
+        
+        # pi_ef
+            
+        if self.cfg.expt.pi_ef_after:
+
+            if self.cfg.expt.pulse_type == 'const':
+
+                self.set_pulse_registers(
+                    ch=self.qubit_ch,
+                    style="const",
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+                    phase=self.deg2reg(0),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+                    length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
+            
+            if self.cfg.expt.pulse_type == 'gauss':
+
+                self.set_pulse_registers(
+                    ch=self.qubit_ch,
+                    style="arb",
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+                    phase=self.deg2reg(0),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+                    waveform="pi_ef")
+
             self.pulse(ch=self.qubit_ch)
             self.sync_all()
 
-        # if cfg.expt.ge_pi_after:
-        #     self.set_pulse_registers(
-        #         ch=self.qubit_ch,
-        #         style="arb",
-        #         freq=self.freq2reg(cfg.device.qubit.f_ge),
-        #         phase=self.deg2reg(0),
-        #         gain=self.cfg.device.qubit.pulses.pi_ge.gain,
-        #         waveform="qubit_pi")
-        #     self.pulse(ch=self.qubit_ch)
 
         self.sync_all(self.us2cycles(0.05)) # align channels and wait 50ns
         self.measure(pulse_ch=self.res_ch,
@@ -111,7 +187,7 @@ class LengthRabiEFExperiment(Experiment):
         #print('updated')
         super().__init__(path=path, prefix=prefix, config_file=config_file, progress=progress)
 
-    def acquire(self, progress=False, data_path=None, filename=None):
+    def acquire(self, progress=False, data_path=None, filename=None, prob_calib=True):
         
         lengths = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
@@ -134,9 +210,20 @@ class LengthRabiEFExperiment(Experiment):
 
         self.data = data
 
-        avgq_col = np.array([data['avgq'][i][0][0] for i in np.arange(len(data['avgq']))])
-        avgi_col = np.array([data['avgi'][i][0][0] for i in np.arange(len(data['avgi']))])
-        data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col}
+        avgi_col = np.array([data["avgi"][i][0][0] for i in range(len(data['avgi']))])
+        avgq_col = np.array([data["avgq"][i][0][0] for i in range(len(data['avgq']))])
+
+        if prob_calib:
+
+            # Calibrate qubit probability
+
+            iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+            i_prob, q_prob = self.get_qubit_prob(avgi_col, avgq_col, iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+            data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col, 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        
+        else:
+
+            data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col}
 
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)

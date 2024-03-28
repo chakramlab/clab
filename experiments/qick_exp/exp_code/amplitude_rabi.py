@@ -19,7 +19,7 @@ class AmplitudeRabiProgram(RAveragerProgram):
         self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
         
         print(cfg.device.soc.readout.ch[0], 'test0')
-        self.f_res=self.freq2reg(self.cfg.device.soc.resonator.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
+        self.f_res=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
         self.readout_length= self.us2cycles(self.cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
         # self.cfg["adc_freqs"]=[adcfreq(self.cfg.device.readout.frequency)]*2   #add frequency of adc ddc to config
@@ -32,7 +32,7 @@ class AmplitudeRabiProgram(RAveragerProgram):
 
         for ch in [0,1]:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.resonator.freq, gen_ch=self.res_ch)
+                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
         
         #add qubit and readout pulses to respective channels
         if self.cfg.expt.pulse_type == "gauss" and self.cfg.expt.sigma_test > 0:
@@ -68,7 +68,7 @@ class AmplitudeRabiProgram(RAveragerProgram):
     
     def body(self):
         cfg=AttrDict(self.cfg)
-        # self.pulse(ch=self.qubit_ch)
+        self.pulse(ch=self.qubit_ch)
         self.sync_all()
         self.measure(pulse_ch=self.res_ch,
                      adcs=[1,0],
@@ -78,9 +78,9 @@ class AmplitudeRabiProgram(RAveragerProgram):
         
         
     
-    # def update(self):
-    #     self.mathi(self.q_rp, self.r_gain, self.r_gain, '+', self.cfg.expt.step) # update gain
-    #     #print(self.q_gain)
+    def update(self):
+        self.mathi(self.q_rp, self.r_gain, self.r_gain, '+', self.cfg.expt.step) # update gain
+        #print(self.q_gain)
                       
                       
 class AmplitudeRabiExperiment(Experiment):
@@ -94,7 +94,7 @@ class AmplitudeRabiExperiment(Experiment):
         super().__init__(path=path,prefix=prefix, config_file=config_file, progress=progress)
         #print('initialized successfully')
 
-    def acquire(self, progress=False, debug=False, data_path=None, filename=None):
+    def acquire(self, progress=False, data_path=None, filename=None):
         #print('starting acquire')
         fpts = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soccfg = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
@@ -103,21 +103,18 @@ class AmplitudeRabiExperiment(Experiment):
         #print('done with soc')
         x_pts, avgi, avgq = amprabi.acquire(self.im[self.cfg.aliases.soc],
                                             threshold=None,
-                                            load_pulses=True,progress=progress, debug=debug)
+                                            load_pulses=True,progress=progress)
         
-        data={'xpts': x_pts, 'avgi':avgi, 'avgq':avgq}
-        
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+    
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
 
-        self.data=data
+        data_dict = {'xpts': x_pts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
 
-        # print(data['xpts'])
-        # print(data['avgi'])
-        # print(data['avgq'])
-        data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
+
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
 
-        return data
 
     def analyze(self, data=None, **kwargs):
         if data is None:

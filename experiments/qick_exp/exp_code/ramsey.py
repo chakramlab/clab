@@ -16,7 +16,6 @@ class RamseyProgram(RAveragerProgram):
         self.res_ch = cfg.device.soc.resonator.ch
         self.qubit_ch = cfg.device.soc.qubit.ch
         
-
         self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
         self.r_wait = 3# self.sreg(self.qubit_ch, "time")
         self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
@@ -27,12 +26,13 @@ class RamseyProgram(RAveragerProgram):
         self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
         self.safe_regwi(self.q_rp, self.r_phase2, 0)
         
-        self.f_res=self.freq2reg(cfg.device.soc.resonator.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
+        self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
         # self.cfg["adc_freqs"]=[adcfreq(cfg.device.soc.readout.frequency)]*2   #add frequency of adc ddc to config
         
         self.piby2sigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma)
+        self.piby2gain = cfg.device.soc.qubit.pulses.pi2_ge.gain
         # print(self.sigma)
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
@@ -40,22 +40,31 @@ class RamseyProgram(RAveragerProgram):
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.resonator.freq, gen_ch=self.res_ch)
-
+                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
 
         # add qubit and readout pulses to respective channels
-        self.set_pulse_registers(ch=self.qubit_ch, style="const", 
-                             freq=self.freq2reg(cfg.device.soc.qubit.f_ge), phase=0,
-                                gain=cfg.device.soc.qubit.pulses.pi_ge.gain, 
-                            length=self.piby2sigma)
-        # self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.piby2sigma, length= self.piby2sigma* 4)
-        # self.set_pulse_registers(
-        #     ch=self.qubit_ch,
-        #     style="arb",
-        #     freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-        #     phase=self.deg2reg(0),
-        #     gain=cfg.device.soc.qubit.pulses.pi_ge.gain,
-        #     waveform="qubit")
+        try: pulse_type = cfg.device.soc.qubit.pulses.pi2_ge.pulse_type
+        except: pulse_type = 'const'
+
+        print ("pulse type = ",pulse_type)
+
+        if pulse_type == 'const':
+
+            self.set_pulse_registers(ch=self.qubit_ch, style="const", 
+                                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), phase=0,
+                                    gain=self.piby2gain, length=self.piby2sigma)
+
+        elif pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.piby2sigma, length= self.piby2sigma* 4)
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                phase=self.deg2reg(0),
+                gain= self.piby2gain,
+                waveform="qubit")
+            print('Pulse type set to gauss')
+            
         self.set_pulse_registers(
             ch=self.res_ch,
             style="const",
@@ -63,56 +72,10 @@ class RamseyProgram(RAveragerProgram):
             phase=self.deg2reg(cfg.device.soc.resonator.phase, gen_ch=self.res_ch),
             gain=cfg.device.soc.resonator.gain,
             length=self.readout_length)
+        
         self.sync_all(self.us2cycles(0.2))
 
-###
-    # def initialize(self):
-    #     cfg = AttrDict(self.cfg)
-    #     self.cfg.update(cfg.expt)
 
-    #     self.res_ch = cfg.device.soc.resonator.ch
-    #     self.qubit_ch = cfg.device.soc.qubit.ch
-
-    #     self.q_rp = self.ch_page(self.qubit_ch)  # get register page for qubit_ch
-    #     self.r_wait = 3
-    #     self.r_phase2 = 4
-    #     # self.r_phase = self.sreg(self.qubit_ch, "phase")
-    #     self.r_phase = 0
-    #     self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
-    #     self.safe_regwi(self.q_rp, self.r_phase2, 0)
-
-    #     self.f_res = self.freq2reg(cfg.device.soc.resonator.freq)  # convert f_res to dac register value
-    #     self.readout_length = self.us2cycles(cfg.device.soc.readout.length)
-    #     # self.cfg["adc_lengths"] = [self.readout_length] * 2  # add length of adc acquisition to config
-    #     # self.cfg["adc_freqs"] = [adcfreq(cfg.device.readout.frequency)] * 2  # add frequency of adc ddc to config
-
-    #     self.sigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma)
-    #     # print(self.sigma)
-
-    #     self.declare_gen(ch=self.res_ch, nqz=cfg.device.soc.resonator.nyqist)
-    #     self.declare_gen(ch=self.qubit_ch, nqz=cfg.device.soc.qubit.nyqist)
-
-    #     for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
-    #         self.declare_readout(ch=ch, length=self.readout_length,
-    #                              freq=cfg.device.soc.responator.freq, gen_ch=self.res_ch)
-
-    #     # add qubit and readout pulses to respective channels
-    #     self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.sigma, length=self.sigma * 4)
-    #     self.set_pulse_registers(
-    #         ch=self.qubit_ch,
-    #         style="arb",
-    #         freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-    #         phase=self.deg2reg(0),
-    #         gain=cfg.device.soc.qubit.pulses.pi2_ge.gain,
-    #         waveform="qubit")
-    #     self.set_pulse_registers(
-    #         ch=self.res_ch,
-    #         style="const",
-    #         freq=self.f_res,
-    #         phase=self.deg2reg(cfg.device.soc.resonator.phase, gen_ch=self.res_ch),
-    #         gain=cfg.device.soc.resonator.gain,
-    #         length=self.readout_length)
-    #     self.sync_all(self.us2cycles(0.2))
 
     def body(self):
         cfg = AttrDict(self.cfg)
@@ -151,21 +114,20 @@ class RamseyExperiment(Experiment):
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         ramsey = RamseyProgram(soc, self.cfg)
         print(self.im[self.cfg.aliases.soc], 'test0')
-        x_pts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
-        
-        data={'xpts': x_pts, 'avgi':avgi, 'avgq':avgq}
-        
-        # x_pts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None, load_pulses=True,
-        #                                    progress=progress, debug=debug)
+        xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
 
-        # data = {'xpts': soc.cycles2us(x_pts), 'avgi': avgi, 'avgq': avgq}
+        # Calibrate qubit probability
 
-        self.data = data
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+    
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
 
-        data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
+        data_dict = {'xpts': xpts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
-        return data
+            
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:
