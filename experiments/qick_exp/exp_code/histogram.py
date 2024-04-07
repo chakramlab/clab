@@ -133,7 +133,7 @@ class HistogramExperiment(Experiment):
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         histpro = HistogramProgram(soc, self.cfg)
         x_pts, avgi, avgq = histpro.acquire(self.im[self.cfg.aliases.soc], threshold=None, load_pulses=True,
-                                            progress=progress, debug=debug)
+                                            progress=progress)
 
         data = {'xpts': x_pts, 'avgi': avgi, 'avgq': avgq}
 

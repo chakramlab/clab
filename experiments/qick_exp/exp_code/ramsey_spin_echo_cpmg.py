@@ -82,7 +82,7 @@ class RamseySpinEchoCPMGProgram(AveragerProgram):
                     gain=self.cfg.device.soc.qubit.pulses.pi2_ge.gain, 
                     length=self.sigma_ge2)
             
-        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+        if self.cfg.device.soc.qubit.pulses.pi2_ge.pulse_type == 'gauss':
             
             self.set_pulse_registers(
                 ch=self.qubit_ch,

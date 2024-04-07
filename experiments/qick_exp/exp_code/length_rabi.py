@@ -64,7 +64,8 @@ class LengthRabiProgram(AveragerProgram):
         self.sigma_test = self.us2cycles(self.cfg.expt.length_placeholder)
         if self.sigma_test > 0:
             self.pulse(ch=self.qubit_ch)
-            self.sync_all()
+            # self.sync_all()
+            self.sync_all(self.us2cycles(0.05))
         self.measure(pulse_ch=self.res_ch,
                      adcs=[0],
                      pins=[0],

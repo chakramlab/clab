@@ -7,7 +7,7 @@ from slab import Experiment, dsfit, AttrDict
 from tqdm import tqdm_notebook as tqdm
 
 
-class RamseyProgram(RAveragerProgram):
+class Piby2phaseoffsetProgram(RAveragerProgram):
 
     def initialize(self):
         cfg = AttrDict(self.cfg)
@@ -15,23 +15,20 @@ class RamseyProgram(RAveragerProgram):
         
         self.res_ch = cfg.device.soc.resonator.ch
         self.qubit_ch = cfg.device.soc.qubit.ch
-        
+
         self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
-        self.r_wait = 3# self.sreg(self.qubit_ch, "time")
-        self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
+
 
         self.r_phase2 = 4
         self.r_phase = self.sreg(self.qubit_ch, "phase")
-        #self.r_phase = 0
-        self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
-        self.safe_regwi(self.q_rp, self.r_phase2, 0)
+        self.safe_regwi(self.q_rp, self.r_phase2, self.deg2reg(self.cfg.expt.start, gen_ch=self.qubit_ch))
         
         self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
 
-        
         self.piby2sigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma)
         self.piby2gain = cfg.device.soc.qubit.pulses.pi2_ge.gain
+
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
@@ -41,10 +38,9 @@ class RamseyProgram(RAveragerProgram):
                                  freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
 
         # add qubit and readout pulses to respective channels
-        try: pulse_type = cfg.device.soc.qubit.pulses.pi2_ge.pulse_type
-        except: pulse_type = 'const'
+        pulse_type = cfg.device.soc.qubit.pulses.pi2_ge.pulse_type
 
-        print ("pulse type = ",pulse_type)
+        print ("pi/2 pulse type = ",pulse_type)
 
         if pulse_type == 'const':
 
@@ -87,8 +83,7 @@ class RamseyProgram(RAveragerProgram):
 
         self.safe_regwi(self.q_rp, self.r_phase, 0)
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
-        self.sync_all()
-        self.sync(self.q_rp, self.r_wait)
+        self.sync_all(self.us2cycles(cfg.expt.delay))  # align channels and wait 50ns
         self.mathi(self.q_rp, self.r_phase, self.r_phase2, "+", 0)
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all(self.us2cycles(0.05))  # align channels and wait 50ns
@@ -99,13 +94,11 @@ class RamseyProgram(RAveragerProgram):
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
 
     def update(self):
-        self.mathi(self.q_rp, self.r_wait, self.r_wait, '+',
-                   self.us2cycles(self.cfg.expt.step))  # update the time between two π/2 pulses
         self.mathi(self.q_rp, self.r_phase2, self.r_phase2, '+',
-                   self.deg2reg(self.cfg.expt.phase_step, gen_ch=self.qubit_ch))  # advance the phase of the LO for the second π/2 pulse
+                   self.deg2reg(self.cfg.expt.step, gen_ch=self.qubit_ch))  # advance the phase of the LO for the second π/2 pulse
 
 
-class RamseyExperiment(Experiment):
+class Piby2phaseoffsetExperiment(Experiment):
     """Ramsey Experiment
        Experimental Config
         expt = {"start":0, "step": 1, "expts":200, "reps": 10, "rounds": 200, "phase_step": deg2reg(360/50)}
@@ -116,11 +109,10 @@ class RamseyExperiment(Experiment):
         super().__init__(path=path, prefix=prefix, config_file=config_file, progress=progress)
 
     def acquire(self, progress=False, debug=False, data_path=None, filename=None):
-        fpts = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-        ramsey = RamseyProgram(soc, self.cfg)
+        ramsey = Piby2phaseoffsetProgram(soc, self.cfg)
         print(self.im[self.cfg.aliases.soc], 'test0')
-        xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
+        xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
         
 
         avgi_rot, avgq_rot = self.iq_rot(avgi[0][0], avgq[0][0], self.cfg.device.soc.readout.iq_rot_theta)
