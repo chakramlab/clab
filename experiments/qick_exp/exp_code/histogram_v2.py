@@ -9,13 +9,9 @@ from tqdm import tqdm_notebook as tqdm
 
 class HistogramProgram(RAveragerProgram):
     def initialize(self):
-        self.cfg.expt.expts = 2
-        self.cfg.expt.rounds = 1
-        self.cfg.expt.start = 0
-        if self.cfg.expt.f_state:
-            self.cfg.expt.step = self.cfg.device.soc.qubit.pulses.pi_ef.gain
-        else:
-            self.cfg.expt.step = self.cfg.device.soc.qubit.pulses.pi_ge.gain    
+        self.cfg.expt.expts=1
+        self.cfg.expt.start=0
+        self.cfg.expt.step=0
         self.cfg.update(self.cfg.expt)
         self.cfg = AttrDict(self.cfg)
 
@@ -27,19 +23,12 @@ class HistogramProgram(RAveragerProgram):
         self.res_ch = cfg.device.soc.resonator.ch
         self.qubit_ch = cfg.device.soc.qubit.ch
 
-        self.q_rp = self.ch_page(self.qubit_ch)  # get register page for qubit_ch
-        self.q_gain = self.sreg(self.qubit_ch, "gain")
-
         # self.safe_regwi(self.q_rp, self.q_gain, cfg.expt.start)
 
         self.f_res = self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length = self.us2cycles(cfg.device.soc.readout.readout_length)
         # self.cfg["adc_lengths"] = [self.readout_length] * 2  # add length of adc acquisition to config
         # self.cfg["adc_freqs"] = [adcfreq(cfg.device.readout.frequency)] * 2  # add frequency of adc ddc to config
-
-        self.pisigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma)
-        self.piefsigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma)
-        # print(self.sigma)
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
@@ -50,53 +39,13 @@ class HistogramProgram(RAveragerProgram):
 
         # add qubit and readout pulses to respective channels
 
-        if self.cfg.expt.f_state:
-            self.qubit_pulse_type = self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type
+        self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
+        self.sigma_ef = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma, gen_ch=self.qubit_ch)
 
-            if self.qubit_pulse_type == "gauss":
-                print('Pulse type: gauss')
-                self.add_gauss(ch=self.qubit_ch, name="qubit_pief", sigma=self.piefsigma, length=self.piefsigma * 4)
-                self.set_pulse_registers(
-                                ch=self.qubit_ch,
-                                style="arb",
-                                freq=self.freq2reg(cfg.device.soc.qubit.f_ef),
-                                phase=self.deg2reg(0),
-                                gain=0,
-                                waveform="qubit_pief")
-                
-            elif self.qubit_pulse_type == "const":
-                print('Pulse type: const')
-                self.set_pulse_registers(
-                                ch=self.qubit_ch,
-                                style="const",
-                                freq=self.freq2reg(cfg.device.soc.qubit.f_ef),
-                                phase=self.deg2reg(0),
-                                gain=0,
-                                length=self.piefsigma)
-
-        else:
-            self.qubit_pulse_type = self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type
-
-            if self.qubit_pulse_type == "gauss":
-                print('Pulse type: gauss')
-                self.add_gauss(ch=self.qubit_ch, name="qubit_pi", sigma=self.pisigma, length=self.pisigma * 4)
-                self.set_pulse_registers(
-                                ch=self.qubit_ch,
-                                style="arb",
-                                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-                                phase=self.deg2reg(0),
-                                gain=0,
-                                waveform="qubit_pi")
-                
-            elif self.qubit_pulse_type == "const":
-                print('Pulse type: const')
-                self.set_pulse_registers(
-                                ch=self.qubit_ch,
-                                style="const",
-                                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-                                phase=self.deg2reg(0),
-                                gain=0,
-                                length=self.pisigma)
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.sigma_ge, length=self.sigma_ge * 4)
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
             
         self.set_pulse_registers(
             ch=self.res_ch,
@@ -107,19 +56,72 @@ class HistogramProgram(RAveragerProgram):
             length=self.readout_length)
         self.sync_all(self.us2cycles(0.2))
 
+    def play_pige_pulse(self, phase = 0, shift = 0):
+
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge + shift), 
+                    phase=self.deg2reg(phase),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
+                    length=self.sigma_ge)
+            
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge + shift),
+                phase=self.deg2reg(phase),
+                gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                waveform="qubit_ge")
+        
+        self.pulse(ch=self.qubit_ch)
+    
+    def play_pief_pulse(self, phase = 0, shift = 0):
+            
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift), 
+                    phase=self.deg2reg(phase),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain, 
+                    length=self.sigma_ef)
+            
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift),
+                phase=self.deg2reg(phase),
+                gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+                waveform="qubit_ef")
+        
+        self.pulse(ch=self.qubit_ch)   
+
     def body(self):
         cfg = self.cfg
-        self.pulse(ch=self.qubit_ch)
-        self.sync_all()
+        print(self.cfg.expt.state_temp)
+        if self.cfg.expt.state_temp == 'e':
+            print('playing ge pulse')
+            self.play_pige_pulse(phase=0)
+            self.sync_all()
+        if self.cfg.expt.state_temp == 'f':
+            self.play_pige_pulse(phase=0)
+            self.sync_all()
+            self.play_pief_pulse(phase=0)
+            self.sync_all()
 
         self.measure(pulse_ch=self.res_ch,
                      adcs=[1, 0],
                      adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
-
-    def update(self):
-        self.mathi(self.q_rp, self.q_gain, self.q_gain, '+', self.cfg.step)  # update frequency list index
 
     def collect_shots(self):
         # collect shots for 2 adcs (0 and 1 indexed) and I and Q channels
@@ -131,11 +133,7 @@ class HistogramProgram(RAveragerProgram):
             cfg.device.soc.readout.readout_length)
         shots_q0 = self.dq_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
             cfg.device.soc.readout.readout_length)
-        shots_i1 = self.di_buf[1].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
-        shots_q1 = self.dq_buf[1].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
-        return shots_i0, shots_q0, shots_i1, shots_q1
+        return shots_i0, shots_q0
 
 
 class HistogramExperiment(Experiment):
@@ -158,21 +156,41 @@ class HistogramExperiment(Experiment):
             self.filename = filename
 
     def acquire(self, progress=False, debug=False):
-        soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-        histpro = HistogramProgram(soc, self.cfg)
-        x_pts, avgi, avgq = histpro.acquire(self.im[self.cfg.aliases.soc], threshold=None, load_pulses=True,
-                                            progress=progress)
+        i_g = []
+        q_g = []
+        i_e = []
+        q_e = []
+        i_f = []
+        q_f = []
+        data_dict = {}
+        if self.cfg.expt.f_state:
+            states = ['g', 'e', 'f']
+        else:
+            states = ['g', 'e']
+        for state in states:
+            self.cfg.expt.state_temp = state
+            soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
+            histpro = HistogramProgram(soc, self.cfg)
+            x_pts, avgi, avgq = histpro.acquire(self.im[self.cfg.aliases.soc], threshold=None, load_pulses=True,
+                                                progress=progress)
+            i, q = histpro.collect_shots()
+            if state=='g':
+                i_g.append(i[0])
+                q_g.append(q[0])
+                data_dict['ig'] = list(i_g[0])
+                data_dict['qg'] = list(q_g[0])
+            if state=='e':
+                i_e.append(i[0])
+                q_e.append(q[0])
+                data_dict['ie'] = list(i_e[0])
+                data_dict['qe'] = list(q_e[0])
+            if state=='f':
+                i_f.append(i[0])
+                q_f.append(q[0])
+                data_dict['if'] = list(i_f[0])
+                data_dict['qf'] = list(q_f[0])
 
-        data = {'xpts': x_pts, 'avgi': avgi, 'avgq': avgq}
-
-        self.data = data
-        i0, q0, i1, q1 = histpro.collect_shots()
-        self.data['i0'] = i0
-        self.data['q0'] = q0
-        self.data['i1'] = i1
-        self.data['q1'] = q1
-
-        data_dict = {'ig': i0[0], 'qg': q0[0], 'ie': i0[1], 'qe': q0[1]}
+        # data_dict = {'ig': i_g[0], 'qg': q_g[0], 'ie': i_e[0], 'qe': q_e[0], 'if': i_f[0], 'qf': q_f[0]}
 
         if self.datapath and self.filename:
             self.save_data(data_path=self.datapath, filename=self.filename, arrays=data_dict)

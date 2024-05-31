@@ -64,7 +64,9 @@ class RamseyGFProgram(RAveragerProgram):
             self.add_gauss(ch=self.qubit_ch, name="qubit_ge2", sigma=self.sigma_ge2, length=self.sigma_ge2 * 4)
         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
-            
+        
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(0.01), length=self.us2cycles(0.01) * 4)
+
         self.set_pulse_registers(
             ch=self.res_ch,
             style="const",
@@ -76,7 +78,32 @@ class RamseyGFProgram(RAveragerProgram):
         print('updated code')
         self.sync_all(self.us2cycles(0.2))
 
+    def play_pi_sb(self, freq= 1, length=1, gain=1, phase=0, shift=0):
 
+        if self.cfg.expt.pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
+        
+        if self.cfg.expt.pulse_type == 'flat_top':
+            
+            print('Sideband flat top')
+            self.set_pulse_registers(
+                ch=self.sideband_ch,
+                style="flat_top",
+                freq=self.freq2reg(freq+shift),
+                phase=self.deg2reg(phase),
+                gain=gain,
+                length=self.us2cycles(length),
+                waveform="sb_flat_top")
+        
+        self.pulse(ch=self.sideband_ch)
 
     def body(self):
         cfg = AttrDict(self.cfg)
@@ -138,20 +165,15 @@ class RamseyGFProgram(RAveragerProgram):
             # pi_f0g1
 
             mode = self.cfg.expt.mode
-
-            self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(self.cfg.device.soc.sideband.f0g1_freqs[mode]), 
-            phase=self.deg2reg(0),
-            gain=self.cfg.device.soc.sideband.pulses.f0g1pi_gains[mode],
-            length=self.us2cycles(self.cfg.device.soc.sideband.pulses.f0g1pi_times[mode]))
             
             print('Sideband freq.:', self.cfg.device.soc.sideband.f0g1_freqs[mode])
             print('Sideband gain:', self.cfg.device.soc.sideband.pulses.f0g1pi_gains[mode])
             print('Sideband length:', self.cfg.device.soc.sideband.pulses.f0g1pi_times[mode])
             
-            self.pulse(ch=self.sideband_ch)
+            self.play_pi_sb(
+                freq = self.cfg.device.soc.sideband.f0g1_freqs[mode],
+                length = self.cfg.device.soc.sideband.pulses.f0g1pi_times[mode],
+                gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[mode])
             self.sync_all()
 
         # Setup and play pi2_ge qubit pulse

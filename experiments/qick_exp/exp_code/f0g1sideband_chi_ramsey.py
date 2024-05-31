@@ -19,9 +19,9 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
 
         self.sideband_ind = cfg.expt.sideband_ind
         print(self.sideband_ind)
-        self.sideband_freq = self.freq2reg(cfg.device.soc.sideband.f0g1_freqs[self.sideband_ind])
+        self.sideband_freq = cfg.device.soc.sideband.f0g1_freqs[self.sideband_ind]
         print(cfg.device.soc.sideband.f0g1_freqs[self.sideband_ind])
-        self.sideband_length = self.us2cycles(cfg.device.soc.sideband.pulses.f0g1pi_times[self.sideband_ind], gen_ch=self.sideband_ch)
+        self.sideband_length = cfg.device.soc.sideband.pulses.f0g1pi_times[self.sideband_ind]
         print(cfg.device.soc.sideband.pulses.f0g1pi_times[self.sideband_ind])
         self.sideband_gain = cfg.device.soc.sideband.pulses.f0g1pi_gains[self.sideband_ind]
         try:
@@ -59,6 +59,7 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
+        self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.device.soc.sideband.nyqist)
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, length=self.readout_length,
@@ -97,7 +98,7 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
 
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef2", sigma=self.sigma_ef2, length=self.sigma_ef2 * 4)
 
-        
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(0.01), length=self.us2cycles(0.01) * 4)
 
         # elif self.pulse_type_ge2 == 'gauss':
         #     self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.piby2sigma, length= self.piby2sigma* 4)
@@ -121,7 +122,33 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
         self.sync_all(self.us2cycles(0.2))
 
         self.declare_gen(ch=self.sideband_ch, nqz=self.sideband_nyquist)
+    
+    def play_pi_sb(self, freq= 1, length=1, gain=1, phase=0, shift=0):
+
+        if self.cfg.expt.pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
         
+        if self.cfg.expt.pulse_type == 'flat_top':
+            
+            print('Sideband flat top')
+            self.set_pulse_registers(
+                ch=self.sideband_ch,
+                style="flat_top",
+                freq=self.freq2reg(freq+shift),
+                phase=self.deg2reg(phase),
+                gain=gain,
+                length=self.us2cycles(length),
+                waveform="sb_flat_top")
+        
+        self.pulse(ch=self.sideband_ch)
 
     def body(self):
         cfg = AttrDict(self.cfg)
@@ -173,15 +200,7 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
         self.pulse(ch=self.qubit_ch)
         self.sync_all()
 
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const", 
-            freq=self.sideband_freq, 
-            phase=0,
-            gain=self.sideband_gain, 
-            length=self.sideband_length)
-
-        self.pulse(ch=self.sideband_ch)
+        self.play_pi_sb(freq=self.sideband_freq, length=self.sideband_length, gain=self.sideband_gain)
 
         self.sync_all()
         self.safe_regwi(self.q_rp, self.r_phase, 0)
@@ -206,7 +225,8 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
                 gain=self.piby2gain,
                 waveform="qubit_ge2")
             
-            
+        
+        
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all()
         self.sync(self.q_rp, self.r_wait)
@@ -225,6 +245,7 @@ class f0g1SidebandChiRamseyProgram(RAveragerProgram):
         self.mathi(self.q_rp, self.r_phase2, self.r_phase2, '+',
                    self.deg2reg(self.cfg.expt.phase_step, gen_ch=self.qubit_ch))  # advance the phase of the LO for the second π/2 pulse
 
+    
 
 class f0g1SidebandChiRamseyExperiment(Experiment):
     """Ramsey Experiment

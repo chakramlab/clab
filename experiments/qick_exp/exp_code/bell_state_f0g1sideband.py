@@ -47,7 +47,7 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
 
         self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
         self.sigma_ef = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma, gen_ch=self.qubit_ch)
-
+        
 
         try: self.pulse_type_ge = cfg.device.soc.qubit.pulses.pi_ge.pulse_type
         except: self.pulse_type_ge = 'const'
@@ -65,6 +65,8 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
 
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
 
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(cfg.expt.sb_sigma), length=self.us2cycles(cfg.expt.sb_sigma) * 4)
+    
         self.set_pulse_registers(
             ch=self.res_ch,
             style="const",
@@ -74,11 +76,39 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
             length=self.readout_length)
         
         self.sync_all(self.us2cycles(0.2))
+
+    def play_sb(self, freq= 1, length=1, gain=1, phase=0, shift=0):
+
+        if self.cfg.expt.pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
+        
+        if self.cfg.expt.pulse_type == 'flat_top':
+            
+            print('Sideband flat top')
+            self.set_pulse_registers(
+                ch=self.sideband_ch,
+                style="flat_top",
+                freq=self.freq2reg(freq+shift),
+                phase=self.deg2reg(phase),
+                gain=gain,
+                length=self.us2cycles(length),
+                waveform="sb_flat_top")
+        
+        self.pulse(ch=self.sideband_ch)
+
     #same
     def body(self):
 
         cfg=AttrDict(self.cfg)
-        self.sigma_test = self.us2cycles(self.cfg.expt.length_placeholder)
+        self.sigma_test = self.cfg.expt.length_placeholder
 
         if self.pulse_type_ge == 'const':
 
@@ -126,12 +156,12 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
         self.pulse(ch=self.qubit_ch)
         self.sync_all()
 
-        sb_mode1_freq = self.cfg.device.soc.sideband.f0g1_freqs[self.cfg.expt.mode1]
-        sb_mode1_sigma = self.cfg.device.soc.sideband.pulses.f0g1pi_times[self.cfg.expt.mode1]
-        sb_mode1_gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[self.cfg.expt.mode1]
-        sb_mode2_freq = self.cfg.device.soc.sideband.f0g1_freqs[self.cfg.expt.mode2]
-        sb_mode2_sigma = self.cfg.device.soc.sideband.pulses.f0g1pi_times[self.cfg.expt.mode2]
-        sb_mode2_gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[self.cfg.expt.mode2]
+        sb_mode1_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][0]
+        sb_mode1_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode1][0]
+        sb_mode1_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][0]
+        sb_mode2_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][0]
+        sb_mode2_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][0]
+        sb_mode2_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode2][0]
 
         print('Mode 1 freq:', sb_mode1_freq)
         print('Mode 1 sigma:', sb_mode1_sigma)
@@ -142,54 +172,22 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
 
         # Sideband on mode 1
 
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(sb_mode1_freq),
-            phase=0,
-            gain=sb_mode1_gain,
-            length=self.sigma_test)
-        
-        self.pulse(ch=self.sideband_ch)
+        self.play_sb(freq=sb_mode1_freq, length=self.sigma_test, gain=sb_mode1_gain)
         self.sync_all()
 
         # pi_f0g1 on mode 2
 
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(sb_mode2_freq),
-            phase=0,
-            gain=sb_mode2_gain,
-            length=self.us2cycles(sb_mode2_sigma))
-        
-        self.pulse(ch=self.sideband_ch)
+        self.play_sb(freq=sb_mode2_freq, length=sb_mode2_sigma, gain=sb_mode2_gain)
         self.sync_all()
 
         if self.cfg.expt.measure_mode1 == True:
-
-            self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(sb_mode1_freq),
-            phase=0,
-            gain=sb_mode1_gain,
-            length=self.us2cycles(sb_mode1_sigma))
-        
-            self.pulse(ch=self.sideband_ch)
+            
+            self.play_sb(freq=sb_mode1_freq, length=sb_mode1_sigma, gain=sb_mode1_gain)
             self.sync_all()
         
         else:
-
-            self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(sb_mode2_freq),
-            phase=0,
-            gain=sb_mode2_gain,
-            length=self.us2cycles(sb_mode2_sigma))
-        
-            self.pulse(ch=self.sideband_ch)
+            
+            self.play_sb(freq=sb_mode2_freq, length=sb_mode2_sigma, gain=sb_mode2_gain)
             self.sync_all()
 
         if cfg.expt.add_pi_ef:

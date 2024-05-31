@@ -74,13 +74,6 @@ class Piby2phaseoffsetProgram(RAveragerProgram):
     def body(self):
         cfg = AttrDict(self.cfg)
 
-        for ch in self.gen_chs.keys():
-            if ch != 4:
-                print(ch)
-                self.setup_and_pulse(ch=ch, style='const', freq=self.freq2reg(100), phase=0, gain=100, length=self.us2cycles(.05), phrst=1)
-
-        self.sync_all(10)
-
         self.safe_regwi(self.q_rp, self.r_phase, 0)
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all(self.us2cycles(cfg.expt.delay))  # align channels and wait 50ns
@@ -108,20 +101,28 @@ class Piby2phaseoffsetExperiment(Experiment):
     def __init__(self, path='', prefix='Ramsey', config_file=None, progress=None):
         super().__init__(path=path, prefix=prefix, config_file=config_file, progress=progress)
 
-    def acquire(self, progress=False, debug=False, data_path=None, filename=None):
+    def acquire(self, progress=False, debug=False, data_path=None, filename=None, prob_calib=True):
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         ramsey = Piby2phaseoffsetProgram(soc, self.cfg)
         print(self.im[self.cfg.aliases.soc], 'test0')
         xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
         
 
-        avgi_rot, avgq_rot = self.iq_rot(avgi[0][0], avgq[0][0], self.cfg.device.soc.readout.iq_rot_theta)
-        data_dict = {'xpts':xpts, 'avgi':avgi[0][0], 'avgq':avgq[0][0], 'avgi_rot':avgi_rot, 'avgq_rot':avgq_rot}
+        data={'xpts': xpts, 'avgi':avgi, 'avgq':avgq}
+        self.data=data
+
+        if prob_calib:
+            # Calibrate qubit probability
+            iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+            i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+            data_dict = {'xpts': xpts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        else:
+            data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
 
         if data_path and filename:
-            self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
-            
-        return data_dict
+            self.save_data(data_path, filename, arrays=data_dict)
+
+        return data
 
     def analyze(self, data=None, **kwargs):
         if data is None:

@@ -10,7 +10,7 @@ from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
 
-class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
+class PhotonNumberResolvedQSpec0pNProgram(AveragerProgram):
     def initialize(self):
 
         # --- Initialize parameters ---
@@ -78,11 +78,10 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
         if self.cfg.expt.qubit_prep_pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_prep", sigma=self.us2cycles(self.cfg.expt.qubit_prep_length), length=self.us2cycles(self.cfg.expt.qubit_prep_length) * 4)
-        # if self.cfg.expt.sb_pulse_type == 'flat_top':
-        #     for ii in range(self.cfg.expt.n):
-        #         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_pi"+str(ii), sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
-
-        print('new version')
+        if self.cfg.expt.sb_pulse_type == 'flat_top':
+            for ii in range(self.cfg.expt.n):
+                self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_pi"+str(ii), sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
+    
         self.synci(200)  # give processor some time to configure pulses
         self.synci(200)  # give processor some time to configure pulses
 
@@ -111,6 +110,30 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
                 waveform="qubit_ge")
         
         self.pulse(ch=self.q_ch)
+    
+    def play_piby2ge(self, phase = 0, shift = 0):
+
+        if self.cfg.device.soc.qubit.pulses.pi2_ge.pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge + shift), 
+                    phase=self.deg2reg(phase),
+                    gain=self.cfg.device.soc.qubit.pulses.pi2_ge.gain, 
+                    length=self.sigma_ge2)
+            
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge + shift),
+                phase=self.deg2reg(phase),
+                gain=self.cfg.device.soc.qubit.pulses.pi2_ge.gain,
+                waveform="qubit_ge")
+        
+        self.pulse(ch=self.qubit_ch)
 
     def play_pi_ef(self, phase=0, shift=0):
 
@@ -138,6 +161,30 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
         
         self.pulse(ch=self.q_ch)
 
+    def play_piby2ef(self, phase = 0, shift = 0):
+                
+        if self.cfg.device.soc.qubit.pulses.pi2_ef.pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift), 
+                    phase=self.deg2reg(phase),
+                    gain=self.cfg.device.soc.qubit.pulses.pi2_ef.gain, 
+                    length=self.sigma_ef)
+            
+        if self.cfg.device.soc.qubit.pulses.pi2_ef.pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift),
+                phase=self.deg2reg(phase),
+                gain=self.cfg.device.soc.qubit.pulses.pi2_ef.gain,
+                waveform="qubit_ef")
+        
+        self.pulse(ch=self.qubit_ch)
+
     def play_pi_sb(self, n = 0, phase=0, shift=0):
 
         if self.cfg.expt.sb_pulse_type == 'const':
@@ -152,8 +199,6 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
                 length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][n]))
             
         if self.cfg.expt.sb_pulse_type == 'flat_top':
-
-            self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
             
             # print('Sideband flat top')
             self.set_pulse_registers(
@@ -163,7 +208,7 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
                 phase=self.deg2reg(phase),
                 gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][n],
                 length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][n]),
-                waveform="sb_flat_top")
+                waveform="sb_flat_top_pi"+str(n))
         
         # self.mathi(self.s_rp, self.s_freq, self.s_freq2, "+", 0)
         self.pulse(ch=self.sideband_ch)
@@ -171,75 +216,41 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
     def body(self):
         cfg=AttrDict(self.cfg)
         
-        chi_e = self.cfg.device.soc.storage.chi_e[cfg.expt.mode]
-        print('Chi_e:', chi_e)
+        chi_e = cfg.device.soc.storage.chi_e[cfg.expt.mode]
+        chi_f = cfg.device.soc.storage.chi_f[cfg.expt.mode]
+        # print('Chi_e:', chi_e)
 
-        # Put n photons into cavity 
+        # Put 0+n photons into cavity 
 
-        for i in np.arange(self.cfg.expt.n):
-            
-            if self.cfg.expt.direct_gf == True:
+        for i in np.arange(cfg.expt.n):
 
-                print('Using direct gf pulse')
-                print('freq:', cfg.device.soc.qubit.f_gf)
-                print('gain:', cfg.device.soc.qubit.pulses.pi_gf.gain)
-                print('sigma:', cfg.device.soc.qubit.pulses.pi_gf.sigma)
-
-                # setup and play qubit gf pi pulse
-            
-                self.pulse_type_gf = self.cfg.device.soc.qubit.pulses.pi_gf.pulse_type
-
-                if self.pulse_type_gf == 'const':
-
-                    print('Playing GF pulse')
-
-                    self.set_pulse_registers(
-                            ch=self.sideband_ch, 
-                            style="const", 
-                            freq=self.freq2reg(self.cfg.device.soc.qubit.f_gf), 
-                            phase=0,
-                            gain=self.cfg.device.soc.qubit.pulses.pi_gf.gain, 
-                            length=self.us2cycles(cfg.device.soc.qubit.pulses.pi_gf.sigma, gen_ch=self.sideband_ch))
+            if i == 0:
+    
+                # use piby2 ef pulse to avoid shelving on level 1
+                self.play_pi_ge()
+                self.sync_all() 
                 
-                    self.pulse(ch=self.sideband_ch)
+                self.play_piby2ef()
+                self.sync_all()
+
+                if self.cfg.expt.n == 1:
+                    self.play_pi_ge()
+                    self.sync_all()
+            
+            else:
+                self.play_pi_ge(shift = i*chi_e)
+                self.sync_all()
+
+                self.play_pi_ef(shift = i*chi_f)
+                self.sync_all()
+
+                #shelving pulse
+                if i != cfg.expt.n-1:
+                    self.play_pi_ge(shift = 0) # always acts on 0 peak # (i+1)*self.chi_e/2)
                     self.sync_all()
 
-                # setup and play f,n g,n+1 sideband probe pulse
-
-                self.set_pulse_registers(
-                    ch=self.sideband_ch,
-                    style="const",
-                    freq=self.freq2reg(self.cfg.device.soc.sideband.fngnp1_freqs[cfg.expt.mode][i]),  # freq set by update
-                    phase=0,
-                    gain=cfg.device.soc.sideband.pulses.fngnp1pi_gains[cfg.expt.mode][i],
-                    length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[cfg.expt.mode][i]))
-                
-                self.pulse(ch=self.sideband_ch)
-                self.sync_all() 
-
-            else:
-
-                # setup and play qubit ge pi pulse
-                
-                if self.cfg.expt.chi_correction:
-                    print('Applying chi correction')
-                    self.play_pi_ge(phase=0, shift=i*chi_e)
-                else:
-                    self.play_pi_ge()
-                self.sync_all()
-
-                # setup and play qubit ef pi pulse
-                
-                if self.cfg.expt.chi_correction:
-                    self.play_pi_ef(phase=0, shift=i*chi_e)
-                else:
-                    self.play_pi_ef()
-                self.sync_all()
-
-                # setup and play f,n g,n+1 sideband probe pulse
-
-                self.play_pi_sb(n=i)
-                self.sync_all() 
+            self.play_pi_sb(n = i, shift = 0)
+            self.sync_all()
 
         self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma, gen_ch=self.q_ch)
 
@@ -275,7 +286,7 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
              wait=True,
              syncdelay=self.relax_delay)
 
-class PhotonNumberResolvedQSpecFockNExperiment(Experiment):
+class PhotonNumberResolvedQSpec0pNExperiment(Experiment):
     """Qubit Spectroscopy Experiment
        Experimental Config
         expt={"start":4020, "step":0.35, "expts":300, "reps": 200,"rounds":50,
@@ -295,7 +306,7 @@ class PhotonNumberResolvedQSpecFockNExperiment(Experiment):
         for i in tqdm(fpts, disable = not progress):
             self.cfg.expt.freq_placeholder = i
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            qspec=PhotonNumberResolvedQSpecFockNProgram(soc, self.cfg)
+            qspec=PhotonNumberResolvedQSpec0pNProgram(soc, self.cfg)
             avgi, avgq = qspec.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=False) 
 
             avgi_col.append(avgi[0][0])

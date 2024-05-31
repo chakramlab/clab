@@ -125,6 +125,7 @@ class WignerTomographyBinomialEncodingProgram(AveragerProgram):
         if self.cavdr_pulse_type == 'gauss':
             print ("cavdr_pulse_type = gauss")
             self.add_gauss(ch=self.cavdr_ch, name="cavdr", sigma=self.us2cycles(self.cavdr_length), length=self.us2cycles(self.cavdr_length)* 4)
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(cfg.expt.sb_ramp_sigma), length=self.us2cycles(cfg.expt.sb_ramp_sigma) * 4)
 
         self.set_pulse_registers(
             ch=self.res_ch,
@@ -232,6 +233,33 @@ class WignerTomographyBinomialEncodingProgram(AveragerProgram):
                 waveform="cavdr")
         
         self.pulse(ch=self.cavdr_ch)
+    
+    def play_sb(self, freq= 1, length=1, gain=1, phase=0, shift=0):
+
+        if self.cfg.expt.pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
+        
+        if self.cfg.expt.pulse_type == 'flat_top':
+            
+            print('Sideband flat top')
+            self.set_pulse_registers(
+                ch=self.sideband_ch,
+                style="flat_top",
+                freq=self.freq2reg(freq+shift),
+                phase=self.deg2reg(phase),
+                gain=gain,
+                length=self.us2cycles(length),
+                waveform="sb_flat_top")
+        
+        self.pulse(ch=self.sideband_ch)
 
     def body(self):
 
@@ -311,19 +339,15 @@ class WignerTomographyBinomialEncodingProgram(AveragerProgram):
         # 3. pi_f0g1
 
         print("pi_f0g1")
-        print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[0][0])
-        print('Gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[0][0])
-        print('Length:', self.cfg.device.soc.sideband.pulses.fngnp1pi_times[0][0])
+        print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][0])
+        print('Gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][0])
+        print('Length:', self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][0])
         
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(self.cfg.device.soc.sideband.fngnp1_freqs[0][0]), 
-            phase=self.deg2reg(0),
-            gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[0][0],
-            length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[0][0]))
-            
-        self.pulse(ch=self.sideband_ch)
+        self.play_sb(
+            freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][0], 
+            length=self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][0],
+            gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][0])
+
         self.sync_all()
 
         # 4. pi_ge (shift by chi_e/2)
@@ -359,19 +383,15 @@ class WignerTomographyBinomialEncodingProgram(AveragerProgram):
         # 7. pi2_f1g2
 
         print("pi2_f1g2")
-        print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[0][1])
-        print('Gain:', self.cfg.device.soc.sideband.pulses.pi2_fngnp1_gains[0][1])
-        print('Length:', self.cfg.device.soc.sideband.pulses.pi2_fngnp1_times[0][1])
+        print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][1])
+        print('Gain:', self.cfg.device.soc.sideband.pulses.pi2_fngnp1_gains[self.cfg.expt.mode][1])
+        print('Length:', self.cfg.device.soc.sideband.pulses.pi2_fngnp1_times[self.cfg.expt.mode][1])
 
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(self.cfg.device.soc.sideband.fngnp1_freqs[0][1]), 
-            phase=self.deg2reg(0),
-            gain=self.cfg.device.soc.sideband.pulses.pi2_fngnp1_gains[0][1],
-            length=self.us2cycles(self.cfg.device.soc.sideband.pulses.pi2_fngnp1_times[0][1]))
-            
-        self.pulse(ch=self.sideband_ch)
+        self.play_sb(
+            freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][1], 
+            length=self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][1],
+            gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][1])
+
         self.sync_all()
 
         # 8. pi_ge (shift by chi_e)
@@ -397,19 +417,15 @@ class WignerTomographyBinomialEncodingProgram(AveragerProgram):
         # 10. pi_f2g3
 
         print("pi_f2g3")
-        print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[0][2])
-        print('Gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[0][2])
-        print('Length:', self.cfg.device.soc.sideband.pulses.fngnp1pi_times[0][2])
+        print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][2])
+        print('Gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][2])
+        print('Length:', self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][2])
         
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(self.cfg.device.soc.sideband.fngnp1_freqs[0][2]), 
-            phase=self.deg2reg(0),
-            gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[0][2],
-            length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[0][2]))
-            
-        self.pulse(ch=self.sideband_ch)
+        self.play_sb(
+            freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][2], 
+            length=self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][2],
+            gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][2])
+
         self.sync_all()
 
         # 11. pi_ge (shift by 4*chi_e/3)
@@ -450,7 +466,7 @@ class WignerTomographyBinomialEncodingProgram(AveragerProgram):
         self.play_pief_pulse(shift = 3*self.chi_ef/2.0)
         self.sync_all()
 
-        # 14. pi_f0g1 and 2pi_f3g4
+        # 14. pi_f0g1 and 4pi_f3g4
 
         print("pi_f0g1 and 2pi_f3g4")
         print('Freq.:', self.cfg.device.soc.sideband.fngnp1_freqs[0][0])

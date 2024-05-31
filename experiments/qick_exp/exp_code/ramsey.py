@@ -28,10 +28,12 @@ class RamseyProgram(RAveragerProgram):
         
         self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
-
+        # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
+        # self.cfg["adc_freqs"]=[adcfreq(cfg.device.soc.readout.frequency)]*2   #add frequency of adc ddc to config
         
         self.piby2sigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma)
         self.piby2gain = cfg.device.soc.qubit.pulses.pi2_ge.gain
+        # print(self.sigma)
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
@@ -77,14 +79,6 @@ class RamseyProgram(RAveragerProgram):
 
     def body(self):
         cfg = AttrDict(self.cfg)
-
-        for ch in self.gen_chs.keys():
-            if ch != 4:
-                print(ch)
-                self.setup_and_pulse(ch=ch, style='const', freq=self.freq2reg(100), phase=0, gain=100, length=self.us2cycles(.05), phrst=1)
-
-        self.sync_all(10)
-
         self.safe_regwi(self.q_rp, self.r_phase, 0)
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all()
@@ -121,10 +115,14 @@ class RamseyExperiment(Experiment):
         ramsey = RamseyProgram(soc, self.cfg)
         print(self.im[self.cfg.aliases.soc], 'test0')
         xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
-        
 
-        avgi_rot, avgq_rot = self.iq_rot(avgi[0][0], avgq[0][0], self.cfg.device.soc.readout.iq_rot_theta)
-        data_dict = {'xpts':xpts, 'avgi':avgi[0][0], 'avgq':avgq[0][0], 'avgi_rot':avgi_rot, 'avgq_rot':avgq_rot}
+        # Calibrate qubit probability
+
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+    
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+
+        data_dict = {'xpts': xpts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
 
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
@@ -163,6 +161,5 @@ class RamseyExperiment(Experiment):
 
         plt.tight_layout()
         plt.show()
-
 
 

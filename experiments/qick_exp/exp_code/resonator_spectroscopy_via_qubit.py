@@ -58,9 +58,9 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
         # --- Initialize pulses ---
 
         # set the nyquist zone
-        self.declare_gen(ch=self.res_ch, nqz=1)
-        self.declare_gen(ch=self.q_ch, nqz=2)
-        self.declare_gen(ch=self.cavdr_ch, nqz=2)
+        self.declare_gen(ch=self.res_ch, nqz=cfg.device.soc.resonator.nyqist)
+        self.declare_gen(ch=self.q_ch, nqz=cfg.device.soc.qubit.nyqist)
+        self.declare_gen(ch=self.cavdr_ch, nqz=cfg.device.soc.storage.nyquist)
 
         # configure the readout lengths and downconversion frequencies
         for ch in self.readout_ch:  # configure the readout lengths and downconversion frequencies
@@ -81,7 +81,7 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
             length=self.readout_length)
         
         if self.cavdr_pulse_type == "const":
-        
+            print('cavdr set to const')
             self.set_pulse_registers(
                 ch=self.cavdr_ch,
                 style="const",
@@ -92,7 +92,7 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
             
         else:
 
-            self.sigma_cavdr = self.cavdr_length//4
+            self.sigma_cavdr = self.cavdr_length
             self.add_gauss(ch=self.cavdr_ch, name="cavdr", sigma=self.sigma_cavdr, length=self.sigma_cavdr * 4)
 
             self.set_pulse_registers(
@@ -128,6 +128,9 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
                     phase=0,
                     gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain, 
                     length=self.sigma_ge)
+            print(cfg.device.soc.qubit.f_ge)
+            print(self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain)
+            print(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma)
         
         self.synci(200)  # give processor some time to configure pulses
         self.synci(200)  # give processor some time to configure pulses
@@ -166,15 +169,19 @@ class ResonatorSpectroscopyViaQubitExperiment(Experiment):
         fpts=self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         qspec=ResonatorSpectroscopyViaQubitProgram(soc, self.cfg)
-        x_pts, avgi, avgq = qspec.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)        
+        x_pts, avgi, avgq = qspec.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)        
         
         data={'fpts':x_pts, 'avgi':avgi, 'avgq':avgq}
         
         self.data=data
         
-        avgi_rot, avgq_rot = self.iq_rot(avgi[0][0], avgq[0][0], theta=self.cfg.device.soc.readout.iq_rot_theta)
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
 
-        data_dict = {'xpts':x_pts, 'avgi':avgi[0][0], 'avgq':avgq[0][0], 'avgi_rot': avgi_rot, 'avgq_rot': avgq_rot}
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+
+        data_dict = {'xpts':x_pts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+
+        # data_dict = {'xpts':x_pts, 'avgi':avgi[0][0], 'avgq':avgq[0][0], 'avgi_rot': avgi_rot, 'avgq_rot': avgq_rot}
 
         # if data_path and filename:
         #     file_path = data_path + get_next_filename(data_path, filename, '.h5')
