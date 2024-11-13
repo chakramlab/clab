@@ -157,7 +157,7 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
         self.sync_all()
 
         sb_mode1_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][0]
-        sb_mode1_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode1][0]
+        sb_mode1_sigma = self.sigma_test
         sb_mode1_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][0]
         sb_mode2_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][0]
         sb_mode2_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][0]
@@ -220,7 +220,7 @@ class BellStatef0g1SidebandProgram(AveragerProgram):
         self.measure(pulse_ch=self.res_ch,
                      adcs=[0],
                      pins=[0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
         

@@ -597,11 +597,11 @@ class IQHistAnalysis():
         self.q_e = q_e
         self.config = config
     
-    def analyze(self, bins=500, plot=True):
+    def analyze(self, bins=500, show=True):
         i_g_med, q_g_med = np.median(self.i_g), np.median(self.q_g)
         i_e_med, q_e_med = np.median(self.i_e), np.median(self.q_e)
 
-        if plot:  # Plot original I and Q
+        if show:  # Plot original I and Q
             fig, ax = plt.subplots(3,2, figsize=(10,10), layout='constrained')
             ax[0][0].scatter(self.i_g, self.q_g, label='Ground', c='#1f77b4')
             ax[0][0].scatter(self.i_e, self.q_e, label='Excited', c='#ff7f0e', alpha=.25)
@@ -623,7 +623,7 @@ class IQHistAnalysis():
         i_g_med, q_g_med = np.median(i_g_rot), np.median(q_g_rot)
         i_e_med, q_e_med = np.median(i_e_rot), np.median(q_e_rot)
 
-        if plot:  # Plot rotated I and Q
+        if show:  # Plot rotated I and Q
             ax[0][1].scatter(i_g_rot, q_g_rot, label='Ground', c='#1f77b4')
             ax[0][1].scatter(i_e_rot, q_e_rot, label='Excited', c='#ff7f0e', alpha=.25)
             ax[0][1].scatter(i_g_med, q_g_med, c='#1f77b4', edgecolors='black', linewidths=.75, s=100, marker='*', label="Ground Median")
@@ -641,7 +641,7 @@ class IQHistAnalysis():
         n_g_q = np.histogram(q_g_rot, bins=bins, range=q_lim)
         n_e_q = np.histogram(q_e_rot, bins=bins, range=q_lim)
 
-        if plot: # Plot histograms of one-dimensional I and Q
+        if show: # Plot histograms of one-dimensional I and Q
             ax[1][0].hist(i_g_rot, bins=bins, range=i_lim, label='Ground')
             ax[1][0].hist(i_e_rot, bins=bins, range=i_lim, label='Excited')
 
@@ -671,7 +671,7 @@ class IQHistAnalysis():
 
         norm = cumsum_g[-1]  # Normalize by total number of points
 
-        if plot:  # Plot normalized cumulative sum and difference
+        if show:  # Plot normalized cumulative sum and difference
             ax[2][0].plot(n_g[1][:-1], cumsum_g/norm, label='Ground')
             ax[2][0].plot(n_e[1][:-1], cumsum_e/norm, label='Excited')
             ax[2][0].plot(n_g[1][:-1], diff/norm, label='Difference')
@@ -693,9 +693,13 @@ class IQHistAnalysis():
 
         fid = np.max(diff/norm)
         rot_angle = theta  # radians
-        print('Readout Fidelity:', fid)
-        print('Rotation Angle:', rot_angle, '[rad.]', '|', rot_angle*180/np.pi, '[deg.]')
-        print('I Threshold:', i_threshold)
+
+        if show:
+            print('Readout Fidelity:', fid)
+            print('Rotation Angle:', rot_angle, '[rad.]', '|', rot_angle*180/np.pi, '[deg.]')
+            print('I Threshold:', i_threshold)
+    
+        return fid
 
 
 

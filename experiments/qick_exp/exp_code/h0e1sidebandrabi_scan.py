@@ -45,7 +45,7 @@ class h0e1SpectroscopyProgram(RAveragerProgram):
         self.s_freq2 = 4
         
         self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=self.cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
-        self.readout_length=self.us2cycles(cfg.device.soc.readout.readout_length)
+        self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
         # self.cfg["adc_freqs"]=[adcfreq(cfg.device.readout.frequency)]*2   #add frequency of adc ddc to config
         
@@ -63,26 +63,7 @@ class h0e1SpectroscopyProgram(RAveragerProgram):
             self.declare_readout(ch=ch, length=self.readout_length,
                                  freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
         
-        # add qubit and readout pulses to respective channels
-
-        self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
-        self.sigma_ef = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma, gen_ch=self.qubit_ch)
-
-        try: self.pulse_type_ge = cfg.device.soc.qubit.pulses.pi_ge.pulse_type
-        except: self.pulse_type_ge = 'const'
-        try: self.pulse_type_ef = cfg.device.soc.qubit.pulses.pi_ef.pulse_type
-        except: self.pulse_type_ef = 'const'
-
-        print('Pulse type_ge: ' + self.pulse_type_ge)
-        print('Pulse type_ef: ' + self.pulse_type_ef)
-            
-        if self.pulse_type_ge == 'gauss':
-
-            self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.sigma_ge, length=self.sigma_ge * 4)
-        
-        if self.pulse_type_ef == 'gauss':
-
-            self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
+        # and readout pulses to respective channels
 
         self.set_pulse_registers(
             ch=self.res_ch,
@@ -94,74 +75,100 @@ class h0e1SpectroscopyProgram(RAveragerProgram):
 
         self.sync_all(self.us2cycles(0.2))
 
-    
-    def body(self):
-        cfg=AttrDict(self.cfg)
+    def play_pi_ge(self):
 
-        # setup and play qubit ge pi pulse
-
-        if self.pulse_type_ge == 'const':
-
-            self.set_pulse_registers(
-                    ch=self.qubit_ch, 
-                    style="const", 
-                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
-                    phase=0,
-                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
-                    length=self.sigma_ge)
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'const':
             
-        if self.pulse_type_ge == 'gauss':
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                phase=0,
+                gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma))
 
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma) * 4)
+    
             self.set_pulse_registers(
                 ch=self.qubit_ch,
                 style="arb",
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge),
                 phase=self.deg2reg(0),
                 gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
                 waveform="qubit_ge")
         
         self.pulse(ch=self.qubit_ch)
+    
+    def play_pi_ef(self):
 
-        self.sync_all()
-
-        # setup and play qubit ef pi pulse
-
-        if self.pulse_type_ef == 'const':
-
-            self.set_pulse_registers(
-                    ch=self.qubit_ch, 
-                    style="const", 
-                    freq=self.freq2reg(cfg.device.soc.qubit.f_ef), 
-                    phase=0,
-                    gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain, 
-                    length=self.sigma_ef)
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
             
-        if self.pulse_type_ef == 'gauss':
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ef), 
+                phase=0,
+                gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain, 
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
+        
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
 
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma) * 4)
+    
             self.set_pulse_registers(
                 ch=self.qubit_ch,
                 style="arb",
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ef),
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
                 phase=self.deg2reg(0),
                 gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
                 waveform="qubit_ef")
-        
+
         self.pulse(ch=self.qubit_ch)
 
-        self.sync_all()
+    def play_pi_fh(self):
 
-        # setup and play qubit fh pi pulse
-
-        self.set_pulse_registers(
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'const':
+            
+            self.set_pulse_registers(
                 ch=self.qubit_ch, 
                 style="const", 
                 freq=self.freq2reg(cfg.device.soc.qubit.f_fh), 
                 phase=0,
                 gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain, 
-                length=self.us2cycles(cfg.device.soc.qubit.pulses.pi_fh.sigma, gen_ch=self.qubit_ch))
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_fh.sigma))
+        
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'gauss':
+
+            self.add_gauss(ch=self.qubit_ch, name="qubit_fh", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_fh.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_fh.sigma) * 4)
+    
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_fh),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain,
+                waveform="qubit_fh")
         
         self.pulse(ch=self.qubit_ch)
 
+    def body(self):
+        cfg=AttrDict(self.cfg)
+
+        # setup and play qubit ge pi pulse
+
+        self.play_pi_ge()
+        self.sync_all()
+
+        # setup and play qubit ef pi pulse
+
+        self.play_pi_ef()
+        self.sync_all()
+
+        # setup and play qubit fh pi pulse
+
+        self.play_pi_fh()
         self.sync_all()
 
         # setup and play h0e1 sideband probe pulse
@@ -182,75 +189,22 @@ class h0e1SpectroscopyProgram(RAveragerProgram):
 
         # setup and play qubit ge pi pulse
 
-        if self.pulse_type_ge == 'const':
-
-            self.set_pulse_registers(
-                    ch=self.qubit_ch, 
-                    style="const", 
-                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
-                    phase=0,
-                    gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
-                    length=self.sigma_ge)
-            
-        if self.pulse_type_ge == 'gauss':
-
-            self.set_pulse_registers(
-                ch=self.qubit_ch,
-                style="arb",
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-                phase=self.deg2reg(0),
-                gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
-                waveform="qubit_ge")
-        
-        self.pulse(ch=self.qubit_ch)
-        
+        self.play_pi_ge()
         self.sync_all()
 
         # Setup and play qubit fh pi pulse
 
-        self.set_pulse_registers(
-                ch=self.qubit_ch, 
-                style="const", 
-                freq=self.freq2reg(cfg.device.soc.qubit.f_fh), 
-                phase=0,
-                gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain, 
-                length=self.us2cycles(cfg.device.soc.qubit.pulses.pi_fh.sigma, gen_ch=self.qubit_ch))
-        
-        self.pulse(ch=self.qubit_ch)
-
+        self.play_pi_fh()
         self.sync_all()
 
         # Setup and play qubit ef pi pulse
 
-        if self.pulse_type_ef == 'const':
-
-            self.set_pulse_registers(
-                    ch=self.qubit_ch, 
-                    style="const", 
-                    freq=self.freq2reg(cfg.device.soc.qubit.f_ef), 
-                    phase=0,
-                    gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain, 
-                    length=self.sigma_ef)
-            
-        if self.pulse_type_ef == 'gauss':
-
-            self.set_pulse_registers(
-                ch=self.qubit_ch,
-                style="arb",
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ef),
-                phase=self.deg2reg(0),
-                gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
-                waveform="qubit_ef")
-        
-        self.pulse(ch=self.qubit_ch)
-
+        self.play_pi_ef()
         self.sync_all(self.us2cycles(0.05))
-
-
 
         self.measure(pulse_ch=self.res_ch,
                      adcs=[1, 0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
         
@@ -279,17 +233,23 @@ class h0e1SpectroscopyExperiment(Experiment):
         
         qspec_ef=h0e1SpectroscopyProgram(soc, self.cfg)
         
-        x_pts, avgi, avgq = qspec_ef.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
+        x_pts, avgi, avgq = qspec_ef.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
         # x_pts, avgi, avgq = qspec_ef.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)        
         
         data={'xpts':x_pts, 'avgi':avgi, 'avgq':avgq}
         
         self.data=data
 
-        data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+    
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+
+        data_dict = {'xpts': x_pts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
-        return data
+            
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:

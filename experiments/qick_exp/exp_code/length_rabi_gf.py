@@ -21,7 +21,7 @@ class LengthRabiGFProgram(AveragerProgram):
         # self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
         
         self.f_res=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
-        self.readout_length= self.us2cycles(self.cfg.device.soc.readout.length)
+        self.readout_length= self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.res_ch)
  
 
 

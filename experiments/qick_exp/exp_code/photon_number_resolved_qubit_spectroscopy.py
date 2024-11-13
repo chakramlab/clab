@@ -143,7 +143,7 @@ class PhotonNumberResolvedQSpecProgram(RAveragerProgram):
         self.measure(pulse_ch=self.res_ch, 
              adcs=self.readout_ch,
              pins = [0],
-             adc_trig_offset=self.adc_trig_offset,
+             adc_trig_offset=self.us2cycles(self.adc_trig_offset),
              wait=True,
              syncdelay=self.relax_delay)
 

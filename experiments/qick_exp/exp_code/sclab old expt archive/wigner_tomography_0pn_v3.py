@@ -26,7 +26,7 @@ class WignerTomographyFock0pNProgram(AveragerProgram):
         self.readout_ch = cfg.device.soc.readout.ch
         self.readout_freq=self.freq2reg(self.res_freq, gen_ch=self.res_ch, ro_ch=self.readout_ch[0])  # convert frequency to dac frequency (ensuring it is an available adc frequency)
         self.res_gain = cfg.device.soc.resonator.gain
-        self.adc_trig_offset = cfg.device.soc.readout.adc_trig_offset
+        self.adc_trig_offset = self.us2cycles(cfg.device.soc.readout.adc_trig_offset)
         self.relax_delay = self.us2cycles(cfg.device.soc.readout.relax_delay)
 
         # Qubit parameters
@@ -233,32 +233,47 @@ class WignerTomographyFock0pNProgram(AveragerProgram):
         
         self.pulse(ch=self.qubit_ch)
 
-    def play_pi_sb(self, n = 0, phase=0, shift=0):
-
-        if self.cfg.expt.fngnp1_pipulse_type == 'const':
-            
-            # print('Sideband const')
-            self.set_pulse_registers(
-                ch=self.sideband_ch,
-                style="const",
-                freq=self.freq2reg(self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][n] + shift),  # freq set by update
-                phase=self.deg2reg(phase),
-                gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][n],
-                length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][n]))
-            
-        if self.cfg.expt.fngnp1_pipulse_type == 'flat_top':
-            
-            # print('Sideband flat top')
-            self.set_pulse_registers(
-                ch=self.sideband_ch,
-                style="flat_top",
-                freq=self.freq2reg(self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][n] +shift),
-                phase=self.deg2reg(phase),
-                gain=self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][n],
-                length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][n]),
-                waveform="sb_flat_top_pi"+str(n))
+    def play_sb(self, freq= 1, length=1, gain=1, ramp_type='sin_squared', ramp_sigma=0.01, phase=0, shift=0):
         
-        # self.mathi(self.s_rp, self.s_freq, self.s_freq2, "+", 0)
+        # why not add this inside the if statement?
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+
+        if self.cfg.expt.sb_pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
+        
+        if self.cfg.expt.sb_pulse_type == 'flat_top':
+            
+            if ramp_type == 'sin_squared':
+                print('Sideband flat top sin squared')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_sin_squared")
+
+            elif ramp_type == 'gaussian':
+                print('Sideband flat top gaussian')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_gaussian")
+        
         self.pulse(ch=self.sideband_ch)
 
     def play_cavity_drive(self, gain = 0, length = 1, phase = 0):
@@ -343,18 +358,15 @@ class WignerTomographyFock0pNProgram(AveragerProgram):
                     self.play_pige(shift = 0) # always acts on 0 peak # (i+1)*self.chi_e/2)
                     self.sync_all()
 
-            self.play_pi_sb(n = i, shift = 0)
-            self.sync_all()
-            # self.set_pulse_registers(
-            #     ch=self.sideband_ch,
-            #     style="const",
-            #     freq=self.freq2reg(cfg.device.soc.sideband.fngnp1_freqs[cfg.expt.mode][i]),  # freq set by update
-            #     phase=0,
-            #     gain=cfg.device.soc.sideband.pulses.fngnp1pi_gains[cfg.expt.mode][i],
-            #     length=self.us2cycles(cfg.device.soc.sideband.pulses.fngnp1pi_times[cfg.expt.mode][i]))
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][i]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][i]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][i]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
-            # self.pulse(ch=self.sideband_ch)
-            # self.sync_all()
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all()
         
         # Cavity displacement
             

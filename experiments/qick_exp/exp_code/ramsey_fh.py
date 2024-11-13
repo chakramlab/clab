@@ -67,47 +67,92 @@ class RamseyFHProgram(RAveragerProgram):
         
         self.sync_all(self.us2cycles(0.2))
 
+    def play_pi_ge(self):
 
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'const':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                phase=0,
+                gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain, 
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma))
+
+        if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
+
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma) * 4)
+    
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.qubit.pulses.pi_ge.gain,
+                waveform="qubit_ge")
+        
+        self.pulse(ch=self.qubit_ch)
+    
+    def play_pi_ef(self):
+
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ef), 
+                phase=0,
+                gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain, 
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
+        
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+
+            self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma) * 4)
+    
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+                waveform="qubit_ef")
+
+        self.pulse(ch=self.qubit_ch)
 
     def body(self):
         cfg = AttrDict(self.cfg)
 
         # Setup and play pi_ge qubit pulse
 
-        self.set_pulse_registers(
-                ch=self.qubit_ch, 
-                style="const", 
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
-                phase=0,
-                gain=self.pigain, 
-                length=self.pisigma)
-        
-        self.pulse(ch=self.qubit_ch) 
+        self.play_pi_ge()
         self.sync_all()
 
         # Setup and play pi_ef qubit pulse
 
-        self.set_pulse_registers(
-            ch=self.qubit_ch, 
-            style="const", 
-            freq=self.freq2reg(cfg.device.soc.qubit.f_ef), 
-            phase=0,
-            gain=self.pigain_ef, 
-            length=self.pisigma_ef)
-        
-        self.pulse(ch=self.qubit_ch) 
+        self.play_pi_ef()
         self.sync_all()
 
         # Setup and play pi/2_fh qubit pulse
 
-        self.set_pulse_registers(
-            ch=self.qubit_ch, 
-            style="const", 
-            freq=self.freq2reg(cfg.device.soc.qubit.f_fh), 
-            phase=0,
-            gain=self.pi2gain_fh, 
-            length=self.pi2sigma_fh)
+        if self.cfg.device.soc.qubit.pulses.pi2_fh.pulse_type == 'const':
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_fh), 
+                phase=0,
+                gain=self.cfg.device.soc.qubit.pulses.pi2_fh.gain, 
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi2_fh.sigma))
         
+        if self.cfg.device.soc.qubit.pulses.pi2_fh.pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="qubit_fh", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi2_fh.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi2_fh.sigma) * 4)
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_fh),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.qubit.pulses.pi2_fh.gain,
+                waveform="qubit_fh")
+
         self.pulse(ch=self.qubit_ch) 
         self.sync_all()
 
@@ -124,35 +169,19 @@ class RamseyFHProgram(RAveragerProgram):
 
         # Setup and play pi_ef qubit pulse
 
-        self.set_pulse_registers(
-            ch=self.qubit_ch, 
-            style="const", 
-            freq=self.freq2reg(cfg.device.soc.qubit.f_ef), 
-            phase=0,
-            gain=self.pigain_ef, 
-            length=self.pisigma_ef)
-        
-        self.pulse(ch=self.qubit_ch) 
+        self.play_pi_ef() 
         self.sync_all()
 
         # Setup and play pi_ge qubit pulse
 
-        self.set_pulse_registers(
-                ch=self.qubit_ch, 
-                style="const", 
-                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
-                phase=0,
-                gain=self.pigain, 
-                length=self.pisigma)
-        
-        self.pulse(ch=self.qubit_ch) 
+        self.play_pi_ge()
         self.sync_all(self.us2cycles(0.05))  # align channels and wait 50ns
 
         # Measure
         
         self.measure(pulse_ch=self.res_ch,
                      adcs=[1, 0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
 
@@ -178,11 +207,16 @@ class RamseyFHExperiment(Experiment):
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         ramsey = RamseyFHProgram(soc, self.cfg)
         print(self.im[self.cfg.aliases.soc], 'test0')
-        xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
+        xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
         
 
-        avgi_rot, avgq_rot = self.iq_rot(avgi[0][0], avgq[0][0], self.cfg.device.soc.readout.iq_rot_theta)
-        data_dict = {'xpts':xpts, 'avgi':avgi[0][0], 'avgq':avgq[0][0], 'avgi_rot':avgi_rot, 'avgq_rot':avgq_rot}
+        # Calibrate qubit probability
+
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+    
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+
+        data_dict = {'xpts': xpts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
 
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)

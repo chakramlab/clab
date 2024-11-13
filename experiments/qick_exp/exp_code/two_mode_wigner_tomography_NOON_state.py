@@ -10,7 +10,7 @@ from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
 
-class WignerTomographyBellStateProgram(AveragerProgram):
+class WignerTomographyNOONStateProgram(AveragerProgram):
     def initialize(self):
 
         # --- Initialize parameters ---
@@ -26,7 +26,7 @@ class WignerTomographyBellStateProgram(AveragerProgram):
         self.readout_ch = cfg.device.soc.readout.ch
         self.readout_freq=self.freq2reg(self.res_freq, gen_ch=self.res_ch, ro_ch=self.readout_ch[0])  # convert frequency to dac frequency (ensuring it is an available adc frequency)
         self.res_gain = cfg.device.soc.resonator.gain
-        self.adc_trig_offset = cfg.device.soc.readout.adc_trig_offset
+        self.adc_trig_offset = self.us2cycles(cfg.device.soc.readout.adc_trig_offset)
         self.relax_delay = self.us2cycles(cfg.device.soc.readout.relax_delay)
 
         # Qubit parameters
@@ -91,26 +91,34 @@ class WignerTomographyBellStateProgram(AveragerProgram):
         
         #initializing pulse register
         # add qubit and readout pulses to respective channels
-            
+
+        # qubit ge and ef pulse parameters
+
         self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
         self.sigma_ge2 = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma, gen_ch=self.qubit_ch)
         self.sigma_ef = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma, gen_ch=self.qubit_ch)
-
-        # taking chi_e and chi_ef just from the experiment config
-
-        self.chi_e = self.cfg.expt.chi_e
-        self.chi_ef = self.cfg.expt.chi_ef
-
-        print ("chi_e = ", self.chi_e, "chi_ef = ", self.chi_ef, "MHz")
-
+        self.sigma_gen_ef = self.us2cycles(cfg.expt.gen_ef_sigma, gen_ch=self.qubit_ch)
+        
         if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.sigma_ge, length=self.sigma_ge * 4)
+        
         if self.cfg.device.soc.qubit.pulses.pi2_ge.pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ge2", sigma=self.sigma_ge2, length=self.sigma_ge2 * 4)
+        
         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
-        if self.cfg.expt.qubit_prep_pulse_type == 'gauss':
-            self.add_gauss(ch=self.qubit_ch, name="qubit_prep", sigma=self.us2cycles(self.cfg.expt.qubit_prep_length), length=self.us2cycles(self.cfg.expt.qubit_prep_length) * 4)
+
+        if cfg.expt.gen_ef_pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="theta_ef", sigma=self.sigma_gen_ef, length=self.sigma_gen_ef * 4)
+
+            
+        self.gen_ef_gain = cfg.expt.gen_ef_gain
+
+        if not bool(self.gen_ef_gain):
+            self.gen_ef_gain = self.cfg.device.soc.qubit.pulses.pi_ef.gain
+            print('Using pi_ge gain for theta_ef pulse. gain = ' + str(self.gen_ef_gain))
+        else:
+            print('Using gen_ef_gain from expt cfg. gain = ' + str(self.gen_ef_gain))
 
         self.set_pulse_registers(
             ch=self.res_ch,
@@ -171,10 +179,104 @@ class WignerTomographyBellStateProgram(AveragerProgram):
         
         self.pulse(ch=self.qubit_ch)
 
+    def play_thetaef_pulse(self, phase = 0, shift = 0):
+
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift), 
+                    phase=self.deg2reg(phase),
+                    gain=self.gen_ef_gain,
+                    length=self.sigma_gen_ef)
+            
+        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift),
+                phase=self.deg2reg(phase),
+                gain=self.gen_ef_gain,
+                waveform="theta_ef")
+
+        print ('Playing theta_ef pulse, length = ' + str(self.sigma_gen_ef) + ' cycles')
+        
+        self.pulse(ch=self.qubit_ch)
+
+    def play_cavity_drive(self, gain = 0, length = 1, phase = 0):
+                
+        if self.cavdr_pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.cavdr_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cavdr_freq, gen_ch=self.cavdr_ch),
+                    phase=self.deg2reg(phase, gen_ch=self.cavdr_ch),
+                    gain=gain, 
+                    length= self.us2cycles(length))
+            
+        if self.cavdr_pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.cavdr_ch,
+                style="arb",
+                freq=self.freq2reg(self.cavdr_freq, gen_ch=self.cavdr_ch),
+                phase=self.deg2reg(phase,gen_ch=self.cavdr_ch),
+                gain=gain,
+                waveform="cavdr")
+        
+        self.pulse(ch=self.cavdr_ch)
+
+
+    
+    def play_sb(self, freq= 1, length=1, gain=1, ramp_type='sin_squared', ramp_sigma=0.01, phase=0, shift=0):
+        
+        # why not add this inside the if statement?
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+
+        if self.cfg.expt.sb_pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
+        
+        if self.cfg.expt.sb_pulse_type == 'flat_top':
+            
+            if ramp_type == 'sin_squared':
+                print('Sideband flat top sin squared')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_sin_squared")
+
+            elif ramp_type == 'gaussian':
+                print('Sideband flat top gaussian')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_gaussian")
+        
+        self.pulse(ch=self.sideband_ch)
+
+
     def body(self):
-
         # Phase reset all channels
-
         for ch in self.gen_chs.keys():
             if ch != 4:
                 print(ch)
@@ -182,55 +284,98 @@ class WignerTomographyBellStateProgram(AveragerProgram):
 
         self.sync_all(10)
 
-        # --- Initialize parameters ---
+        # # --- Initialize parameters ---
 
         cfg = self.cfg
         self.cfg.update(self.cfg.expt)
 
-        # State Preparation
+        if self.cfg.expt.chi_correction:
+            chi_e_mode1 = self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode1]
+            chi_f_mode1 = self.cfg.device.soc.storage.chi_f[self.cfg.expt.mode1]
+            chi_ef_mode1 = chi_f_mode1 - chi_e_mode1
+            chi_e_mode2 = self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode2]
+            chi_f_mode2 = self.cfg.device.soc.storage.chi_f[self.cfg.expt.mode2]
+            chi_ef_mode2 = chi_f_mode2 - chi_e_mode2
+        else:
+            chi_e_mode1 = 0
+            chi_f_mode1 = 0
+            chi_ef_mode1 = 0
+            chi_e_mode2 = 0
+            chi_f_mode2 = 0
+            chi_ef_mode2 = 0
 
-        # pi_ge
+        print('Chi e mode 1:', chi_e_mode1)
+        print('Chi f mode 1:', chi_f_mode1)
+        print('Chi ef mode 1:', chi_ef_mode1)
+        print('Chi e mode 2:', chi_e_mode2)
+        print('Chi f mode 2:', chi_f_mode2)
+        print('Chi ef mode 2:', chi_ef_mode2)
 
-        self.play_pige_pulse(phase = 0, shift = 0)
-        self.sync_all()
+        # # --- State preparation ---
         
-        # pi_ef
+        for i in range(self.cfg.expt.n):
 
-        self.play_pief_pulse(phase = 0, shift = 0)
-        self.sync_all()
+            if i == 0:
+                # Step 1
+                # pi_ge 
+                self.play_pige_pulse()
+                self.sync_all()
 
-        sb_mode1_freq = self.cfg.device.soc.sideband.f0g1_freqs[self.cfg.expt.mode1]
-        sb_mode1_sigma = self.cfg.expt.sb_mode1_sigma
-        sb_mode1_gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[self.cfg.expt.mode1]
-        sb_mode2_freq = self.cfg.device.soc.sideband.f0g1_freqs[self.cfg.expt.mode2]
-        sb_mode2_sigma = self.cfg.device.soc.sideband.pulses.f0g1pi_times[self.cfg.expt.mode2]
-        sb_mode2_gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[self.cfg.expt.mode2]
+                # Step 2
+                # theta_ef
+                self.play_thetaef_pulse()
+                self.sync_all()
+            else:
+                # Step (1+6i)
+                # pi_ef (shifted by i*chi_ef_mode1)
+                self.play_pief_pulse(shift=i*chi_ef_mode1)
+                self.sync_all()
 
-        # Sideband on mode 1
+                # Step (2+6i)
+                # pi_ge (shifted by i*chi_e_mode2)
+                # Shelving in the e manifold
+                self.play_pige_pulse(shift=i*chi_e_mode2)
+                self.sync_all()
 
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(sb_mode1_freq),
-            phase=0,
-            gain=sb_mode1_gain,
-            length=self.us2cycles(sb_mode1_sigma))
-        
-        self.pulse(ch=self.sideband_ch)
-        self.sync_all()
+            # Step (3 + 6i)
+            # pi_sb (fi-g(i+1)) mode 1
 
-        # pi_f0g1 on mode 2
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][i]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode1][i]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][i]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode1][i]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode1]
+            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
-        self.set_pulse_registers(
-            ch=self.sideband_ch,
-            style="const",
-            freq=self.freq2reg(sb_mode2_freq),
-            phase=0,
-            gain=sb_mode2_gain,
-            length=self.us2cycles(sb_mode2_sigma))
-        
-        self.pulse(ch=self.sideband_ch)
-        self.sync_all()
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all()
+
+            # Step (4 + 6i)
+            # pi_ef (shifted by i*chi_ef_mode2)
+            self.play_pief_pulse(shift=i*chi_ef_mode2)
+            self.sync_all()
+
+            # Step (5+6i) 
+            # pi_ge (shifted by (i+1)*chi_e_mode1)
+            # Shelving in the e manifold. Except: NO SHELVING IN THE LAST STEP
+            if i != self.cfg.expt.n-1:
+                self.play_pige_pulse(shift=(i+1)*chi_e_mode1)
+                self.sync_all()
+
+            # Step (6+6i) or Final step (5+6n):  
+            # pi_sb (fi-g(i+1)) mode 2
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][i]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][i]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode2][i]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode2][i]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode2]
+            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all()
+
+
+        # # --- Wigner Tomography ---
 
         # Cavity displacement
         
@@ -291,7 +436,7 @@ class WignerTomographyBellStateProgram(AveragerProgram):
              wait=True,
              syncdelay=self.relax_delay)
 
-class WignerTomographyBellStateExperiment(Experiment):
+class WignerTomographyNOONStateExperiment(Experiment):
     """Qubit Spectroscopy Experiment
        Experimental Config
         expt={"start":4020, "step":0.35, "expts":300, "reps": 200,"rounds":50,
@@ -318,7 +463,7 @@ class WignerTomographyBellStateExperiment(Experiment):
             self.cfg.expt.cavdr2_phase_temp = l
             print('Gain1 = ', i, 'Phase1 = ', j, 'Gain2 = ', k, 'Phase2 = ', l)
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            wigtom=WignerTomographyBellStateProgram(soc, self.cfg)
+            wigtom=WignerTomographyNOONStateProgram(soc, self.cfg)
             avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=False)
 
             avgi_col.append(avgi[0][0])

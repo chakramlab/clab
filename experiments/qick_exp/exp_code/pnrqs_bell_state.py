@@ -78,7 +78,7 @@ class PNRQSBellStateProgram(AveragerProgram):
             self.add_gauss(ch=self.q_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
         if self.cfg.expt.qubit_prep_pulse_type == 'gauss':
             self.add_gauss(ch=self.q_ch, name="qubit_prep", sigma=self.us2cycles(self.cfg.expt.qubit_prep_length), length=self.us2cycles(self.cfg.expt.qubit_prep_length) * 4)
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(cfg.expt.sb_ramp_sigma), length=self.us2cycles(cfg.expt.sb_ramp_sigma) * 4)
+        
 
         # convert frequency to DAC frequency
         self.freq=self.freq2reg(self.res_freq, gen_ch=self.res_ch, ro_ch=self.readout_ch[0])  # convert frequency to dac frequency (ensuring it is an available adc frequency)
@@ -143,6 +143,7 @@ class PNRQSBellStateProgram(AveragerProgram):
         self.pulse(ch=self.q_ch)
     
     def play_sb(self, freq= 1, length=1, gain=1, phase=0, shift=0):
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
 
         if self.cfg.expt.pulse_type == 'const':
             
@@ -198,12 +199,12 @@ class PNRQSBellStateProgram(AveragerProgram):
         self.play_pief_pulse(phase = 0, shift = 0)
         self.sync_all()
 
-        sb_mode1_freq = self.cfg.device.soc.sideband.f0g1_freqs[self.cfg.expt.mode1]
+        sb_mode1_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][0]
         sb_mode1_sigma = self.cfg.expt.sb_mode1_sigma
-        sb_mode1_gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[self.cfg.expt.mode1]
-        sb_mode2_freq = self.cfg.device.soc.sideband.f0g1_freqs[self.cfg.expt.mode2]
-        sb_mode2_sigma = self.cfg.device.soc.sideband.pulses.f0g1pi_times[self.cfg.expt.mode2]
-        sb_mode2_gain = self.cfg.device.soc.sideband.pulses.f0g1pi_gains[self.cfg.expt.mode2]
+        sb_mode1_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][0]
+        sb_mode2_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][0]
+        sb_mode2_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][0]
+        sb_mode2_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode2][0]
 
         print(sb_mode1_freq)
         print(sb_mode2_freq)
@@ -212,7 +213,7 @@ class PNRQSBellStateProgram(AveragerProgram):
         print(sb_mode1_gain)
         print(sb_mode2_gain)
 
-        # Sideband on mode 1
+        # pi2_f0g1 on mode 1
 
         self.play_sb(freq=sb_mode1_freq, length=sb_mode1_sigma, gain=sb_mode1_gain)
         self.sync_all()
@@ -254,7 +255,7 @@ class PNRQSBellStateProgram(AveragerProgram):
         self.measure(pulse_ch=self.res_ch, 
              adcs=self.readout_ch,
              pins = [0],
-             adc_trig_offset=self.adc_trig_offset,
+             adc_trig_offset=self.us2cycles(self.adc_trig_offset),
              wait=True,
              syncdelay=self.relax_delay)
 

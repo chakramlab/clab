@@ -141,7 +141,7 @@ class AmplitudeRabiProgram(AveragerProgram):
         self.measure(pulse_ch=self.res_ch,
                      adcs=[0],
                      pins=[0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
         

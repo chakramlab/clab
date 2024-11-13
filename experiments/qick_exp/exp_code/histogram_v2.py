@@ -26,7 +26,7 @@ class HistogramProgram(RAveragerProgram):
         # self.safe_regwi(self.q_rp, self.q_gain, cfg.expt.start)
 
         self.f_res = self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
-        self.readout_length = self.us2cycles(cfg.device.soc.readout.readout_length)
+        self.readout_length = self.us2cycles(self.cfg.expt.readout_length, gen_ch=self.res_ch)
         # self.cfg["adc_lengths"] = [self.readout_length] * 2  # add length of adc acquisition to config
         # self.cfg["adc_freqs"] = [adcfreq(cfg.device.readout.frequency)] * 2  # add frequency of adc ddc to config
 
@@ -119,7 +119,7 @@ class HistogramProgram(RAveragerProgram):
 
         self.measure(pulse_ch=self.res_ch,
                      adcs=[1, 0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+                     adc_trig_offset=self.us2cycles(cfg.expt.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
 
@@ -128,11 +128,11 @@ class HistogramProgram(RAveragerProgram):
         cfg = self.cfg
 
         # print(self.di_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)))
-        # print(cfg.device.readout.readout_length)
+        # print(cfg.device.readout.length)
         shots_i0 = self.di_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
+            cfg.device.soc.readout.length)
         shots_q0 = self.dq_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
+            cfg.device.soc.readout.length)
         return shots_i0, shots_q0
 
 

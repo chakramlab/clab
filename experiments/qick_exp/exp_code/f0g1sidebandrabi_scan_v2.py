@@ -45,7 +45,7 @@ class f0g1SpectroscopyProgram(RAveragerProgram):
         self.s_freq2 = 4
         
         self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=self.cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
-        self.readout_length=self.us2cycles(cfg.device.soc.readout.readout_length)
+        self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
         # self.cfg["adc_freqs"]=[adcfreq(cfg.device.readout.frequency)]*2   #add frequency of adc ddc to config
         
@@ -84,7 +84,7 @@ class f0g1SpectroscopyProgram(RAveragerProgram):
 
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
 
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top", sigma=self.us2cycles(0.01), length=self.us2cycles(0.01) * 4)
+        
 
         self.set_pulse_registers(
             ch=self.res_ch,
@@ -97,6 +97,9 @@ class f0g1SpectroscopyProgram(RAveragerProgram):
         self.sync_all(self.us2cycles(0.2))
 
     def play_sb(self, freq= 1, length=1, gain=1, phase=0, shift=0):
+
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(0.01), length=self.us2cycles(0.01) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(0.01) * 2)
 
         if self.cfg.expt.pulse_type == 'const':
             
@@ -111,15 +114,27 @@ class f0g1SpectroscopyProgram(RAveragerProgram):
         
         if self.cfg.expt.pulse_type == 'flat_top':
             
-            print('Sideband flat top')
-            self.set_pulse_registers(
-                ch=self.sideband_ch,
-                style="flat_top",
-                freq=self.freq2reg(freq+shift),
-                phase=self.deg2reg(phase),
-                gain=gain,
-                length=self.us2cycles(length),
-                waveform="sb_flat_top")
+            if self.cfg.expt.flat_top_type == 'sin_squared':
+                print('Sideband flat top sin squared')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_sin_squared")
+            
+            elif self.cfg.expt.flat_top_type == 'gaussian':
+                print('Sideband flat top gaussian')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_gaussian")
         
         self.mathi(self.s_rp, self.s_freq, self.s_freq2, "+", 0)
         self.pulse(ch=self.sideband_ch)
@@ -216,7 +231,7 @@ class f0g1SpectroscopyProgram(RAveragerProgram):
 
         self.measure(pulse_ch=self.res_ch,
                      adcs=[1, 0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
         
