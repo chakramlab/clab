@@ -39,8 +39,10 @@ class RamseySpinEchoProgram(RAveragerProgram):
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
 
         # add qubit and readout pulses to respective channels
         try: pulse_type = cfg.device.soc.qubit.pulses.pi2_ge.pulse_type
@@ -163,11 +165,36 @@ class RamseySpinEchoProgram(RAveragerProgram):
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all(self.us2cycles(0.05))  # align channels and wait 50ns
 
-        self.measure(pulse_ch=self.res_ch,
-                     adcs=[1, 0],
-                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
-                     syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
         
         # Transmon Reset

@@ -64,8 +64,10 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
 
         # configure the readout lengths and downconversion frequencies
         for ch in self.readout_ch:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=self.res_freq, gen_ch=self.res_ch)
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
 
 
         # convert frequency to DAC frequency
@@ -144,12 +146,36 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
         self.pulse(ch=self.q_ch)
         self.sync_all()
 
-        self.measure(pulse_ch=self.res_ch, 
-             adcs=self.readout_ch,
-             pins = [0],
-             adc_trig_offset=self.us2cycles(self.adc_trig_offset),
-             wait=True,
-             syncdelay=self.relax_delay)
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                     wait=True,
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
     def update(self):
         self.mathi(self.cavdr_reg_page, self.cavdr_freq_reg, self.cavdr_freq_reg, '+', self.cavdr_freq_step) # update frequency list index

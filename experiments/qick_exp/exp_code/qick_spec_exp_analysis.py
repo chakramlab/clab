@@ -663,7 +663,7 @@ class IQHistAnalysis():
         diff = cumsum_g - cumsum_e
 
         max_ind = diff.argmax()
-        i_threshold = n_g[1][:-1][max_ind]
+        i_threshold = (n_g[1][1:] + n_g[1][:-1])[max_ind]/2
         
         cumsum_g_q = np.cumsum(n_g_q[0])
         cumsum_e_q = np.cumsum(n_e_q[0])
@@ -675,6 +675,7 @@ class IQHistAnalysis():
             ax[2][0].plot(n_g[1][:-1], cumsum_g/norm, label='Ground')
             ax[2][0].plot(n_e[1][:-1], cumsum_e/norm, label='Excited')
             ax[2][0].plot(n_g[1][:-1], diff/norm, label='Difference')
+            ax[2][0].axvline(i_threshold, linestyle='--', c='grey', label='Threshold')
             
             ax[2][0].set_title('I, Normalized Cumulative Sum')
             ax[2][0].set_xlabel('I')
@@ -699,7 +700,7 @@ class IQHistAnalysis():
             print('Rotation Angle:', rot_angle, '[rad.]', '|', rot_angle*180/np.pi, '[deg.]')
             print('I Threshold:', i_threshold)
     
-        return fid
+        return {'fid': fid, 'rot_angle': rot_angle, 'i_threshold': i_threshold, 'i_g_med': i_g_med, 'q_g_med': q_g_med, 'i_e_med': i_e_med, 'q_e_med': q_e_med, 'i_g_rot': i_g_rot, 'i_e_rot': i_e_rot}
 
 
 

@@ -41,8 +41,10 @@ class fngnp1RabiProgram(AveragerProgram):
 
 
         for ch in [0]:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
         
         # qubit ge and ef pulse parameters
 
@@ -138,7 +140,7 @@ class fngnp1RabiProgram(AveragerProgram):
         if pulse_type == 'flat_top':
             
             if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -149,7 +151,7 @@ class fngnp1RabiProgram(AveragerProgram):
                     waveform="sb_flat_top_sin_squared")
 
             elif ramp_type == 'bump':
-                print('Sideband flat top bump')
+                # print('Sideband flat top bump')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -160,7 +162,7 @@ class fngnp1RabiProgram(AveragerProgram):
                     waveform="sb_flat_top_bump")
 
             elif ramp_type == 'gaussian':
-                print('Sideband flat top gaussian')
+                # print('Sideband flat top gaussian')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -195,8 +197,8 @@ class fngnp1RabiProgram(AveragerProgram):
         for i in np.arange(cfg.expt.n):
             
             if self.cfg.expt.chi_correction:
-                print('chi_ge_cor', chi_e * i)
-                print('chi_ef_cor', (chi_f - chi_e) * i)
+                # print('chi_ge_cor', chi_e * i)
+                # print('chi_ef_cor', (chi_f - chi_e) * i)
                 chi_ge_cor = chi_e * i
                 chi_ef_cor = (chi_f - chi_e) * i
             else:
@@ -219,7 +221,7 @@ class fngnp1RabiProgram(AveragerProgram):
             sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+            # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
             self.sync_all()
@@ -230,7 +232,7 @@ class fngnp1RabiProgram(AveragerProgram):
         else:
             chi_ge_cor = 0
             chi_ef_cor = 0
-        print('Probe chi correction:', 'chi_ge_cor', chi_ge_cor, 'chi_ef_cor', chi_ef_cor)
+        # print('Probe chi correction:', 'chi_ge_cor', chi_ge_cor, 'chi_ef_cor', chi_ef_cor)
 
         # pi_ge
             
@@ -244,7 +246,7 @@ class fngnp1RabiProgram(AveragerProgram):
 
         # fngnp1 vs time pulse
 
-        print('probe ramp sigma', self.cfg.expt.sb_sigma)
+        # print('probe ramp sigma', self.cfg.expt.sb_sigma)
         self.play_sb(freq=cfg.expt.freq, length=self.sigma_fngnp1, gain=cfg.expt.gain, pulse_type=self.cfg.expt.fngnp1_pulse_type, ramp_type=self.cfg.expt.flat_top_type, ramp_sigma=self.cfg.expt.sb_sigma, phase=0)
         self.sync_all()
 
@@ -265,19 +267,43 @@ class fngnp1RabiProgram(AveragerProgram):
             sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+            # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
             
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
             self.sync_all()
 
 
 
-        self.measure(pulse_ch=self.res_ch,
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
                      adcs=[0],
-                     pins=[0],
-                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
-                     syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
         
         
         # System Reset
@@ -288,7 +314,7 @@ class fngnp1RabiProgram(AveragerProgram):
 
             for ii in range(cfg.device.soc.readout.reset_cycles):
 
-                print('Resetting System,', 'Cycle', ii)
+                # print('Resetting System,', 'Cycle', ii)
 
                 # Transmon Reset
 
@@ -300,7 +326,7 @@ class fngnp1RabiProgram(AveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
@@ -328,15 +354,15 @@ class fngnp1RabiProgram(AveragerProgram):
                 for ii in range(self.cfg.device.soc.readout.reset_cavity_n-1, -1, -1):
                     
                     if self.cfg.expt.chi_correction:
-                        print('chi_ge_cor', chi_e * ii)
-                        print('chi_ef_cor', (chi_f - chi_e) * ii)
+                        # print('chi_ge_cor', chi_e * ii)
+                        # print('chi_ef_cor', (chi_f - chi_e) * ii)
                         chi_ge_cor = chi_e * ii
                         chi_ef_cor = (chi_f - chi_e) * ii
                     else:
                         chi_ge_cor = 0
                         chi_ef_cor = 0
 
-                    print('Resetting cavity for n =', ii+1)
+                    # print('Resetting cavity for n =', ii+1)
 
                     # setup and play f,n g,n+1 sideband pi pulse
 
@@ -346,7 +372,7 @@ class fngnp1RabiProgram(AveragerProgram):
                     sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
                     sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][ii]
                     sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-                    print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
                     self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
                     self.sync_all()
 

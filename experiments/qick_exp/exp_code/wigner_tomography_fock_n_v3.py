@@ -81,8 +81,10 @@ class WignerTomographyFockNProgram(AveragerProgram):
 
         # configure the readout lengths and downconversion frequencies
         for ch in self.readout_ch:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=self.res_freq, gen_ch=self.res_ch)
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
         
         #initializing pulse register
         # add qubit and readout pulses to respective channels
@@ -124,12 +126,8 @@ class WignerTomographyFockNProgram(AveragerProgram):
             phase=self.deg2reg(0, gen_ch=self.res_ch), # 0 degrees
             gain=self.res_gain, 
             length=self.readout_length)
-        
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma * 4))
-        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2)
-        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
 
-        print('new settings! 5')
+        # print('new settings! 5')
         self.synci(500)  # give processor some time to configure pulses
 
     def play_pige(self, phase = 0, shift = 0):
@@ -205,6 +203,10 @@ class WignerTomographyFockNProgram(AveragerProgram):
         self.pulse(ch=self.qubit_ch)   
 
     def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=0.01, phase=0, shift=0):
+        
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma * 4))
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
 
         if pulse_type == 'const':
             
@@ -231,7 +233,7 @@ class WignerTomographyFockNProgram(AveragerProgram):
                     waveform="sb_flat_top_sin_squared")
 
             elif ramp_type == 'bump':
-                print('Sideband flat top bump')
+                # print('Sideband flat top bump')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -297,6 +299,112 @@ class WignerTomographyFockNProgram(AveragerProgram):
 
         self.sync_all(10)
         
+        # Reset |1> in cavity
+
+        # System Reset
+
+        if cfg.expt.cavity_reset_beginning:
+
+            self.cfg.device.soc.readout.reset_cavity_n =  1
+
+            for ii in range(cfg.device.soc.readout.reset_cycles):
+
+                print('Resetting System,', 'Cycle', ii)
+
+                # Transmon Reset
+
+                # f0g1 to readout mode
+
+                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                self.sync_all()
+
+                # pi_ef
+
+                self.play_pief()
+                self.sync_all()
+
+                # f0g1 to readout mode
+
+                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                self.sync_all()
+
+                # Cavity Reset
+
+                for ii in range(self.cfg.device.soc.readout.reset_cavity_n-1, -1, -1):
+                    
+                    if self.cfg.expt.chi_correction:
+
+                        print('chi_ge_cor', self.chi_e * ii)
+                        print('chi_ef_cor', (self.chi_ef * ii))
+                        chi_ge_cor = self.chi_e * ii
+                        chi_ef_cor = self.chi_ef * ii
+                    else:
+                        chi_ge_cor = 0
+                        chi_ef_cor = 0
+
+                    print('Resetting cavity for n =', ii)
+
+                    # setup and play f,n g,n+1 sideband pi pulse
+
+                    sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][ii]
+                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][ii]
+                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][ii]
+                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
+                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][ii]
+                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+                    print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                    self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+                    self.sync_all()
+
+                    # Transmon Reset
+
+                    # f0g1 to readout mode
+
+                    sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                    
+                    self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                    self.sync_all()
+
+                    # pi_ef
+
+                    self.play_pief(shift=chi_ef_cor)
+                    self.sync_all()
+
+                    # f0g1 to readout mode
+
+                    sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                    
+                    self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                    self.sync_all()
+
         # Put n photons into cavity
 
         for i in np.arange(cfg.expt.n):
@@ -313,11 +421,39 @@ class WignerTomographyFockNProgram(AveragerProgram):
             sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+            # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
             self.sync_all()
         
+        if self.cfg.expt.reset_before_tomography:
+            print('Resetting transmon before tomography')
+
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pi_lengths[0]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+            sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all(self.us2cycles(self.cfg.expt.reset_before_tomography_time))
+
+            self.play_pief(phase=0)
+            self.sync_all()
+
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pi_lengths[0]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+            sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all(self.us2cycles(self.cfg.expt.reset_before_tomography_time))
+
         # Cavity displacement
             
         self.play_cavity_drive(gain = self.cavdr_gain, length = self.cavdr_length, phase = self.cavdr_phase)
@@ -341,12 +477,36 @@ class WignerTomographyFockNProgram(AveragerProgram):
         self.pulse(ch=self.q_ch)  # Qubit pi/2 pulse
         self.sync_all()
 
-        self.measure(pulse_ch=self.res_ch, 
-             adcs=self.readout_ch,
-             pins = [0],
-             adc_trig_offset=self.us2cycles(self.adc_trig_offset),
-             wait=True,
-             syncdelay=self.relax_delay)
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                     wait=True,
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
             
 class WignerTomographyFockNExperiment(Experiment):
     """Qubit Spectroscopy Experiment
@@ -369,7 +529,7 @@ class WignerTomographyFockNExperiment(Experiment):
         for i,j in tqdm(zip(cavdr_gains, cavdr_phases), total=len(cavdr_gains), disable = not progress):
             self.cfg.expt.cavdr_gain_temp = i
             self.cfg.expt.cavdr_phase_temp = j
-            print('Gain = ', i, 'Phase = ', j)
+            # print('Gain = ', i, 'Phase = ', j)
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
             wigtom=WignerTomographyFockNProgram(soc, self.cfg)
             avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)

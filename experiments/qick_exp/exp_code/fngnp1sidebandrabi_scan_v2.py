@@ -54,8 +54,10 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
             self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.device.soc.sideband.nyqist)
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
         
         # add qubit and readout pulses to respective channels
 
@@ -206,7 +208,7 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
         if self.cfg.expt.fngnp1_pulse_type == 'flat_top':
             
             if self.cfg.expt.flat_top_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -217,7 +219,7 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
                     waveform="sb_flat_top_sin_squared")
 
             elif self.cfg.expt.flat_top_type == 'bump':
-                print('Sideband flat top bump')
+                # print('Sideband flat top bump')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -228,7 +230,7 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
                     waveform="sb_flat_top_bump")
 
             elif self.cfg.expt.flat_top_type == 'gaussian':
-                print('Sideband flat top gaussian')
+                # print('Sideband flat top gaussian')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -279,7 +281,7 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
             sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-            print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+            # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
             self.sync_all()
 
@@ -301,7 +303,7 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
         self.sync_all()
 
         # setup and play f0g1 sideband probe pulse
-        print('Playing probe pulse, length = ' + str(cfg.expt.length))
+        # print('Playing probe pulse, length = ' + str(cfg.expt.length))
         self.play_sb_probe(freq=cfg.expt.start, length=cfg.expt.length, gain=cfg.expt.gain, phase=0, shift=0)
         self.sync_all()
 
@@ -311,11 +313,36 @@ class fngnp1SpectroscopyProgram(RAveragerProgram):
             self.play_pief_pulse(shift = chi_ef_cor)
             self.sync_all()
 
-        self.measure(pulse_ch=self.res_ch,
-                     adcs=[1, 0],
-                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
-                     syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
         # System Reset
 

@@ -45,8 +45,10 @@ class HistogramProgram(RAveragerProgram):
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(self.cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=self.cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
 
         # add qubit and readout pulses to respective channels
 
@@ -112,11 +114,36 @@ class HistogramProgram(RAveragerProgram):
         self.pulse(ch=self.qubit_ch)
         self.sync_all()
 
-        self.measure(pulse_ch=self.res_ch,
-                     adcs=[1, 0],
-                     adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
-                     syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
     def update(self):
         self.mathi(self.q_rp, self.q_gain, self.q_gain, '+', self.cfg.step)  # update frequency list index
@@ -127,14 +154,10 @@ class HistogramProgram(RAveragerProgram):
 
         # print(self.di_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)))
         # print(cfg.device.readout.readout_length)
-        shots_i0 = self.di_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
-        shots_q0 = self.dq_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
-        shots_i1 = self.di_buf[1].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
-        shots_q1 = self.dq_buf[1].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(
-            cfg.device.soc.readout.readout_length)
+        shots_i0 = self.di_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0])
+        shots_q0 = self.dq_buf[0].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0])
+        shots_i1 = self.di_buf[1].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0])
+        shots_q1 = self.dq_buf[1].reshape((cfg.expt.expts, cfg.expt.reps)) / self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0])
         return shots_i0, shots_q0, shots_i1, shots_q1
 
 

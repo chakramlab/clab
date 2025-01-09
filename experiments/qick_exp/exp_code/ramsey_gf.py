@@ -50,9 +50,10 @@ class RamseyGFProgram(RAveragerProgram):
 
 
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
-            self.declare_readout(ch=ch, length=self.readout_length,
-                                 freq=cfg.device.soc.readout.freq, gen_ch=self.res_ch)
-
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
         # add qubit and readout pulses to respective channels
         self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
         self.sigma_ge2 = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma, gen_ch=self.qubit_ch)
@@ -104,6 +105,7 @@ class RamseyGFProgram(RAveragerProgram):
         
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
 
         if pulse_type == 'const':
             
@@ -129,6 +131,17 @@ class RamseyGFProgram(RAveragerProgram):
                     length=self.us2cycles(length),
                     waveform="sb_flat_top_sin_squared")
 
+            elif ramp_type == 'bump':
+                print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+                
             elif ramp_type == 'gaussian':
                 print('Sideband flat top gaussian')
                 self.set_pulse_registers(
@@ -316,11 +329,36 @@ class RamseyGFProgram(RAveragerProgram):
 
         # Measure
         
-        self.measure(pulse_ch=self.res_ch,
-                     adcs=[1, 0],
-                     adc_trig_offset=self.us2cycles(cfg.device.soc.readout.adc_trig_offset),
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
-                     syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))  # sync all channels
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
         # System Reset
 
