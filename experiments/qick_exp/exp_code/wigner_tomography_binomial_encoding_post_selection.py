@@ -212,7 +212,7 @@ class WignerTomographyBinomialEncodingPostSelectionProgram(AveragerProgram):
         self.pulse(ch=self.qubit_ch)   
 
     def play_cavity_drive(self, gain = 0, length = 1, phase = 0):
-                
+            
         if self.cavdr_pulse_type == 'const':
 
             self.set_pulse_registers(
@@ -750,7 +750,7 @@ class WignerTomographyBinomialEncodingPostSelectionProgram(AveragerProgram):
         
         # Parity Measurement
         
-      # Qubit pi/2 pulse
+        # Qubit pi/2 pulse
         self.play_piby2ge()
         self.sync_all(self.qubit_pi2_waittime)  # Wait for time tau = chi/2
 

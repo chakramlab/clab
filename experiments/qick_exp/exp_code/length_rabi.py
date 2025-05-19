@@ -51,14 +51,14 @@ class LengthRabiProgram(AveragerProgram):
 
         self.sync_all(self.us2cycles(0.2))
     
-    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0):
+    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='bump', ramp_sigma=1, phase=0, shift=0):
         
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
 
         if pulse_type == 'const':
             
-            print('Sideband const')
+            # print('Sideband const')
             self.set_pulse_registers(
                     ch=self.sideband_ch, 
                     style="const", 
@@ -70,7 +70,7 @@ class LengthRabiProgram(AveragerProgram):
         if pulse_type == 'flat_top':
             
             if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -81,7 +81,7 @@ class LengthRabiProgram(AveragerProgram):
                     waveform="sb_flat_top_sin_squared")
 
             elif ramp_type == 'gaussian':
-                print('Sideband flat top gaussian')
+                # print('Sideband flat top gaussian')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -121,7 +121,7 @@ class LengthRabiProgram(AveragerProgram):
         # Readout kick pulse
 
         if self.cfg.device.soc.readout.kick_pulse:
-            print('Playing kick pulse')
+            # print('Playing kick pulse')
             self.set_pulse_registers(
                 ch=self.cfg.device.soc.resonator.ch,
                 style="const",
@@ -149,12 +149,16 @@ class LengthRabiProgram(AveragerProgram):
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
         
+        print('Readout relax delay (us)', self.cfg.device.soc.readout.relax_delay)
+
         # Transmon Reset
 
         if cfg.expt.reset:
             
+            print('Initiating transmon reset')
+            
             for ii in range(cfg.device.soc.readout.reset_cycles):
-                print('Resetting System,', 'Cycle', ii)
+                # print('Resetting System,', 'Cycle', ii)
 
                 # f0g1 to readout mode
 
@@ -164,7 +168,7 @@ class LengthRabiProgram(AveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
@@ -202,7 +206,7 @@ class LengthRabiProgram(AveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
@@ -232,7 +236,7 @@ class LengthRabiExperiment(Experiment):
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
         data={"xpts":[], "avgi":[], "avgq":[], "amps":[], "phases":[]}
         for length in tqdm(lengths, disable=not progress):
-            self.cfg.expt.length_placeholder = float(length)
+            self.cfg.expt.length_placeholder = length
             lenrabi = LengthRabiProgram(soc, self.cfg)
             self.prog=lenrabi
             avgi,avgq=lenrabi.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)

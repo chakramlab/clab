@@ -355,11 +355,12 @@ class fngnp1BangBangProgram(AveragerProgram):
                 'Length:', self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][self.cfg.expt.n], 
                 'Gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n],
                 'Freq. offset:', self.cfg.expt.freq_offset_placeholder, 'Gain offset:', self.cfg.expt.gain_offset_placeholder)
-
+            print('waiting 0 ns between pulses')
             for ii in np.arange(self.cfg.expt.n_placeholder):
 
                 self.pulse(ch=self.sideband_ch)
                 self.sync_all()
+                # self.sync_all(self.us2cycles(0.0023))
 
 
 

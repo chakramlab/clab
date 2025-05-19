@@ -283,7 +283,7 @@ class RamseyEFProgram(RAveragerProgram):
         
         self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
                      adcs=[0],
-                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 

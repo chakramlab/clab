@@ -79,6 +79,7 @@ class f0g1sidebandT1Program(RAveragerProgram):
         
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
 
         if pulse_type == 'const':
             
@@ -104,6 +105,17 @@ class f0g1sidebandT1Program(RAveragerProgram):
                     length=self.us2cycles(length),
                     waveform="sb_flat_top_sin_squared")
 
+            elif ramp_type == 'bump':
+                print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+                
             elif ramp_type == 'gaussian':
                 print('Sideband flat top gaussian')
                 self.set_pulse_registers(

@@ -464,27 +464,30 @@ class WignerTomographyNOONStatePostSelectionProgram(AveragerProgram):
             'Readout reset length: ', cfg.device.soc.readout.readout_reset_length, 'us')
         
         # # --- Wigner Tomography ---
-
+        print('Playing gaussian cavity drives')
         # Cavity displacement
+        self.add_gauss(ch=self.cavdr_ch, name="cavdr1", sigma=self.us2cycles(self.cfg.expt.length), length=self.us2cycles(self.cfg.expt.length)* 4)
         
         self.set_pulse_registers(
-            ch=self.cavdr_ch,
-            style="const",
-            freq=self.cavdr_freq,
-            phase=self.deg2reg(self.cavdr_phase, gen_ch=self.cavdr_ch),
-            gain=self.cavdr_gain,
-            length=self.cavdr_length)
+                ch=self.cavdr_ch,
+                style="arb",
+                freq=self.cavdr_freq,
+                phase=self.deg2reg(self.cavdr_phase,gen_ch=self.cavdr_ch),
+                gain=self.cavdr_gain,
+                waveform="cavdr1")
         
         self.pulse(ch=self.cavdr_ch)
         self.sync_all() 
+
+        self.add_gauss(ch=self.cavdr_ch, name="cavdr2", sigma=self.us2cycles(self.cfg.expt.length2), length=self.us2cycles(self.cfg.expt.length2)* 4)
         
         self.set_pulse_registers(
-            ch=self.cavdr_ch,
-            style="const",
-            freq=self.cavdr2_freq,
-            phase=self.deg2reg(self.cavdr2_phase, gen_ch=self.cavdr_ch),
-            gain=self.cavdr2_gain,
-            length=self.cavdr2_length)
+                ch=self.cavdr_ch,
+                style="arb",
+                freq=self.cavdr2_freq,
+                phase=self.deg2reg(self.cavdr2_phase,gen_ch=self.cavdr_ch),
+                gain=self.cavdr2_gain,
+                waveform="cavdr2")
         
         self.pulse(ch=self.cavdr_ch)
         self.sync_all() 

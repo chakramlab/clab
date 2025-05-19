@@ -97,6 +97,7 @@ class NOONStateCoherenceRamseyProgram(AveragerProgram):
         # why not add this inside the if statement?
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
 
         if pulse_type == 'const':
             
@@ -122,6 +123,17 @@ class NOONStateCoherenceRamseyProgram(AveragerProgram):
                     length=self.us2cycles(length),
                     waveform="sb_flat_top_sin_squared")
 
+            elif ramp_type == 'bump':
+                print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+                
             elif ramp_type == 'gaussian':
                 print('Sideband flat top gaussian')
                 self.set_pulse_registers(
@@ -350,11 +362,11 @@ class NOONStateCoherenceRamseyProgram(AveragerProgram):
 
        # Decode NOON State
 
-        for ii in range(self.cfg.expt.n-1, -1, -1):
+        for i in range(self.cfg.expt.n-1, -1, -1):
             
-            print('ii:', ii)
+            print('ii:', i)
 
-            if ii == 0:
+            if i == 0:
 
                 self.sync_all() 
 
@@ -443,6 +455,21 @@ class NOONStateCoherenceRamseyProgram(AveragerProgram):
         self.play_pi2_ge_pulse(phase=0)
         self.sync_all()  
 
+        if self.cfg.expt.reset_f: 
+            
+            print('Resetting |f>')
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+            # sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pi_lengths[0]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+            sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+            # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+            
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all()
+
         # Readout kick pulse
 
         if self.cfg.device.soc.readout.kick_pulse:
@@ -473,6 +500,263 @@ class NOONStateCoherenceRamseyProgram(AveragerProgram):
                      adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
+
+        # System Reset
+
+        if self.cfg.expt.chi_correction:
+            chi_e_mode1 = self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode1]
+            chi_f_mode1 = self.cfg.device.soc.storage.chi_f[self.cfg.expt.mode1]
+            chi_ef_mode1 = chi_f_mode1 - chi_e_mode1
+            chi_e_mode2 = self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode2]
+            chi_f_mode2 = self.cfg.device.soc.storage.chi_f[self.cfg.expt.mode2]
+            chi_ef_mode2 = chi_f_mode2 - chi_e_mode2
+        else:
+            chi_e_mode1 = 0
+            chi_f_mode1 = 0
+            chi_ef_mode1 = 0
+            chi_e_mode2 = 0
+            chi_f_mode2 = 0
+            chi_ef_mode2 = 0
+
+        if cfg.expt.reset:
+
+            # Mode 1
+
+            self.cfg.device.soc.readout.reset_cavity_n = self.cfg.expt.n
+
+            for jj in range(cfg.device.soc.readout.reset_cycles):
+
+                print('Reset cycle:', jj)
+
+                for kk in range(cfg.device.soc.readout.reset_cavity_n, 0, -1):
+                    
+                    print('Resetting cavity for N =', kk)
+
+                    # Cavity Reset for |gN>
+
+                    for ii in range(kk-1, -1, -1):
+
+                        print('Pulse for gn=', ii+1)
+                        
+                        if self.cfg.expt.chi_correction:
+                            # print('chi_ge_cor', chi_e * ii)
+                            # print('chi_ef_cor', (chi_f - chi_e) * ii)
+                            chi_ge_cor = chi_e_mode1 * ii
+                            chi_ef_cor = (chi_f_mode1 - chi_e_mode1) * ii
+                        else:
+                            chi_ge_cor = 0
+                            chi_ef_cor = 0
+
+                        # print('Resetting cavity for n =', ii)
+
+                        # setup and play f,n g,n+1 sideband pi pulse
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][ii]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode1][ii]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][ii]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode1]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode1][ii]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode1]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                        # Transmon Reset
+
+                        # f0g1 with N photons in storage cavity to readout mode
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0] + chi_f_mode1 * (ii)
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                    # Cavity Reset for |eN>
+
+                    # pi_ef
+
+                    self.play_pief_pulse(shift = (kk)*chi_ef_cor)
+                    self.sync_all()
+
+                    # f0g1 with N photons in storage cavity to readout mode
+
+                    sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0] + chi_f_mode1 * (kk)
+                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                    
+                    self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                    self.sync_all()
+
+                    for ii in range(kk-1, -1, -1):
+                        print('Pulse for en=', ii+1)
+                        if self.cfg.expt.chi_correction:
+                            # print('chi_ge_cor', chi_e * ii)
+                            # print('chi_ef_cor', (chi_f - chi_e) * ii)
+                            chi_ge_cor = chi_e_mode1 * ii
+                            chi_ef_cor = (chi_f_mode1 - chi_e_mode1) * ii
+                        else:
+                            chi_ge_cor = 0
+                            chi_ef_cor = 0
+
+                        # print('Resetting cavity for n =', ii)
+
+                        # setup and play f,n g,n+1 sideband pi pulse
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][ii]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode1][ii]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][ii]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode1]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode1][ii]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode1]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                        # Transmon Reset
+
+                        # f0g1 with N photons in storage cavity to readout mode
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0] + chi_f_mode1 * (ii)
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                        print('chi_f', chi_f_mode1)
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+                
+                self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
+
+            # Mode 2
+
+            self.cfg.device.soc.readout.reset_cavity_n = self.cfg.expt.n
+
+            for jj in range(cfg.device.soc.readout.reset_cycles):
+
+                print('Reset cycle:', jj)
+
+                for kk in range(cfg.device.soc.readout.reset_cavity_n, 0, -1):
+                    
+                    print('Resetting cavity for N =', kk)
+
+                    # Cavity Reset for |gN>
+
+                    for ii in range(kk-1, -1, -1):
+
+                        print('Pulse for gn=', ii+1)
+                        
+                        if self.cfg.expt.chi_correction:
+                            # print('chi_ge_cor', chi_e * ii)
+                            # print('chi_ef_cor', (chi_f - chi_e) * ii)
+                            chi_ge_cor = chi_e_mode2 * ii
+                            chi_ef_cor = (chi_f_mode2 - chi_e_mode2) * ii
+                        else:
+                            chi_ge_cor = 0
+                            chi_ef_cor = 0
+
+                        # print('Resetting cavity for n =', ii)
+
+                        # setup and play f,n g,n+1 sideband pi pulse
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][ii]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][ii]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode2][ii]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode2]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode2][ii]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode2]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                        # Transmon Reset
+
+                        # f0g1 with N photons in storage cavity to readout mode
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0] + chi_f_mode2 * (ii)
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                    # Cavity Reset for |eN>
+
+                    # pi_ef
+
+                    self.play_pief_pulse(shift = (kk)*chi_ef_cor)
+                    self.sync_all()
+
+                    # f0g1 with N photons in storage cavity to readout mode
+
+                    sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0] + chi_f_mode2 * (kk)
+                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                    
+                    self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                    self.sync_all()
+
+                    for ii in range(kk-1, -1, -1):
+                        print('Pulse for en=', ii+1)
+                        if self.cfg.expt.chi_correction:
+                            # print('chi_ge_cor', chi_e * ii)
+                            # print('chi_ef_cor', (chi_f - chi_e) * ii)
+                            chi_ge_cor = chi_e_mode2 * ii
+                            chi_ef_cor = (chi_f_mode2 - chi_e_mode2) * ii
+                        else:
+                            chi_ge_cor = 0
+                            chi_ef_cor = 0
+
+                        # print('Resetting cavity for n =', ii)
+
+                        # setup and play f,n g,n+1 sideband pi pulse
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][ii]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][ii]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode2][ii]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode2]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode2][ii]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode2]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                        # Transmon Reset
+
+                        # f0g1 with N photons in storage cavity to readout mode
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0] + chi_f_mode2 * (ii)
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                        print('chi_f', chi_f_mode2)
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
 class NOONStateCoherenceRamseyExperiment(Experiment):
     """Qubit Spectroscopy Experiment

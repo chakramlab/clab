@@ -33,7 +33,7 @@ class ResonatorSpectroscopyProgram(AveragerProgram):
         for ch in self.readout_ch:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, 
                                  length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
-                                 freq=cfg.device.soc.readout.freq, 
+                                 freq=self.res_freq, 
                                  gen_ch=self.cfg.device.soc.resonator.ch)
 
 
@@ -98,7 +98,7 @@ class ResonatorSpectroscopyProgram(AveragerProgram):
             self.set_pulse_registers(
                 ch=self.cfg.device.soc.resonator.ch,
                 style="const",
-                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                freq=self.freq2reg(self.cfg.expt.length_placeholder, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
                 phase=self.deg2reg(0),
                 gain=self.cfg.device.soc.readout.kick_pulse_gain,
                 length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
@@ -111,7 +111,7 @@ class ResonatorSpectroscopyProgram(AveragerProgram):
         self.set_pulse_registers(
             ch=self.cfg.device.soc.resonator.ch,
             style="const",
-            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            freq=self.freq2reg(self.cfg.expt.length_placeholder, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
             phase=self.deg2reg(0),
             gain=self.cfg.device.soc.resonator.gain,
             length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))

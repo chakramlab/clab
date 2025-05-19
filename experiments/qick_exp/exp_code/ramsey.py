@@ -92,10 +92,11 @@ class RamseyProgram(RAveragerProgram):
         
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
 
         if pulse_type == 'const':
             
-            print('Sideband const')
+            # print('Sideband const')
             self.set_pulse_registers(
                     ch=self.sideband_ch, 
                     style="const", 
@@ -107,7 +108,7 @@ class RamseyProgram(RAveragerProgram):
         if pulse_type == 'flat_top':
             
             if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -117,8 +118,19 @@ class RamseyProgram(RAveragerProgram):
                     length=self.us2cycles(length),
                     waveform="sb_flat_top_sin_squared")
 
+            elif ramp_type == 'bump':
+                # print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+                
             elif ramp_type == 'gaussian':
-                print('Sideband flat top gaussian')
+                # print('Sideband flat top gaussian')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -133,8 +145,95 @@ class RamseyProgram(RAveragerProgram):
 
     def body(self):
         cfg = AttrDict(self.cfg)
-        self.safe_regwi(self.q_rp, self.r_phase, 0)
 
+        # System Reset
+
+        if cfg.device.soc.readout.reset_cavity_beginning:
+            print('Resetting cavity in beginning:')
+            print('For modes:', [ii+1 for ii in cfg.device.soc.readout.reset_cavity_beginning_modes])
+            print('Up to n =', cfg.device.soc.readout.reset_cavity_beginning_n)
+
+            for jj in range(cfg.device.soc.readout.reset_cavity_beginning_reset_cycles):
+                
+                # Transmon Reset
+
+                # f0g1 to readout mode
+
+                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                self.sync_all()
+
+                # Cavity Reset
+
+                for kk in self.cfg.device.soc.readout.reset_cavity_beginning_modes:
+                    # print('Resetting cavity mode', kk+1)
+
+                    for ii in range(self.cfg.device.soc.readout.reset_cavity_beginning_n-1, -1, -1):
+                        
+                        self.chi_e = self.cfg.device.soc.storage.chi_e[kk]
+                        self.chi_f = self.cfg.device.soc.storage.chi_f[kk]
+                        self.chi_ef = self.chi_f - self.chi_e
+                        chi_ge_cor = self.chi_e * ii
+                        chi_ef_cor = self.chi_ef * ii
+            
+
+                        # print('Resetting cavity for n =', ii)
+
+                        # setup and play f,n g,n+1 sideband pi pulse
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[kk][ii]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[kk][ii]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[kk][ii]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[kk]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[kk][ii]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[kk]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                        # Transmon Reset
+
+                        # f0g1 to readout mode
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+                        # pi_ef
+
+                        self.play_pief_pulse(shift=chi_ef_cor)
+                        self.sync_all()
+
+                        # f0g1 to readout mode
+
+                        sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                        # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                        
+                        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                        self.sync_all()
+
+            self.sync_all(self.us2cycles(self.cfg.device.soc.readout.reset_cavity_beginning_relax_delay))
+
+        self.safe_regwi(self.q_rp, self.r_phase, 0)
         try: pulse_type = cfg.device.soc.qubit.pulses.pi2_ge.pulse_type
         except: pulse_type = 'const'
 
@@ -201,7 +300,7 @@ class RamseyProgram(RAveragerProgram):
 
             self.sync_all()
             for ii in range(cfg.device.soc.readout.reset_cycles):
-                print('Resetting System,', 'Cycle', ii)
+                # print('Resetting System,', 'Cycle', ii)
 
                 # f0g1 to readout mode
 
@@ -211,7 +310,7 @@ class RamseyProgram(RAveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
@@ -229,7 +328,7 @@ class RamseyProgram(RAveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()

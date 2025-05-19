@@ -26,9 +26,6 @@ class HistogramProgram(RAveragerProgram):
         # self.safe_regwi(self.q_rp, self.q_gain, cfg.expt.start)
 
         self.f_res = self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
-        self.readout_length = self.us2cycles(self.cfg.expt.readout_length, gen_ch=self.res_ch)
-        # self.cfg["adc_lengths"] = [self.readout_length] * 2  # add length of adc acquisition to config
-        # self.cfg["adc_freqs"] = [adcfreq(cfg.device.readout.frequency)] * 2  # add frequency of adc ddc to config
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
@@ -43,14 +40,20 @@ class HistogramProgram(RAveragerProgram):
 
         self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma, gen_ch=self.qubit_ch)
         self.sigma_ef = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma, gen_ch=self.qubit_ch)
+        self.sigma_fh = self.us2cycles(cfg.device.soc.qubit.pulses.pi_fh.sigma, gen_ch=self.qubit_ch)
 
         if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.sigma_ge, length=self.sigma_ge * 4)
         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
-        
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="qubit_fh", sigma=self.sigma_fh, length=self.sigma_fh * 4)
         self.sideband_ch = cfg.device.soc.sideband.ch
         self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.device.soc.sideband.nyqist)
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2)
+
+        
         
         self.sync_all(self.us2cycles(0.2))
 
@@ -101,15 +104,38 @@ class HistogramProgram(RAveragerProgram):
                 waveform="qubit_ef")
         
         self.pulse(ch=self.qubit_ch)   
+
+    def play_pifh_pulse(self, phase = 0, shift = 0):
+            
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'const':
+
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_fh + shift), 
+                    phase=self.deg2reg(phase),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain, 
+                    length=self.sigma_fh)
+            
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'gauss':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_fh + shift),
+                phase=self.deg2reg(phase),
+                gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain,
+                waveform="qubit_fh")
+        
+        self.pulse(ch=self.qubit_ch)
     
     def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0):
         
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
-        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+        
 
         if pulse_type == 'const':
             
-            print('Sideband const')
+            # print('Sideband const')
             self.set_pulse_registers(
                     ch=self.sideband_ch, 
                     style="const", 
@@ -121,7 +147,7 @@ class HistogramProgram(RAveragerProgram):
         if pulse_type == 'flat_top':
             
             if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -132,7 +158,7 @@ class HistogramProgram(RAveragerProgram):
                     waveform="sb_flat_top_sin_squared")
 
             elif ramp_type == 'gaussian':
-                print('Sideband flat top gaussian')
+                # print('Sideband flat top gaussian')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -156,6 +182,13 @@ class HistogramProgram(RAveragerProgram):
             self.play_pige_pulse(phase=0)
             self.sync_all()
             self.play_pief_pulse(phase=0)
+            self.sync_all()
+        if self.cfg.expt.state_temp == 'h':
+            self.play_pige_pulse(phase=0)
+            self.sync_all()
+            self.play_pief_pulse(phase=0)
+            self.sync_all()
+            self.play_pifh_pulse(phase=0)
             self.sync_all()
 
         # Readout kick pulse
@@ -189,13 +222,18 @@ class HistogramProgram(RAveragerProgram):
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
+        print('Readout relax delay (us):', self.cfg.device.soc.readout.relax_delay)
+        print('Readout length (us):', self.cfg.expt.readout_length)
+        print('ADC trigger offset (us):', self.cfg.expt.adc_trig_offset)
+        print('Readout gain (DAC units):', self.cfg.device.soc.resonator.gain)
+
         # Transmon Reset
 
         if cfg.expt.reset:
-
+            print('Initiating transmon reset')
             self.sync_all()
             for ii in range(cfg.device.soc.readout.reset_cycles):
-                print('Resetting System,', 'Cycle', ii)
+                # print('Resetting System,', 'Cycle', ii)
 
                 # f0g1 to readout mode
 
@@ -205,11 +243,29 @@ class HistogramProgram(RAveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
 
+                # pi_fh
+
+                self.play_pifh_pulse()
+                self.sync_all()
+
+                # f0g1 to readout mode
+
+                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                self.sync_all()
+                
                 # pi_ef
 
                 self.play_pief_pulse()
@@ -223,10 +279,11 @@ class HistogramProgram(RAveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
+
 
             self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
@@ -267,9 +324,11 @@ class HistogramExperiment(Experiment):
         q_e = []
         i_f = []
         q_f = []
+        i_h = []
+        q_h = []
         data_dict = {}
-        if self.cfg.expt.f_state:
-            states = ['g', 'e', 'f']
+        if self.cfg.expt.f_h_state:
+            states = ['g', 'e', 'f', 'h']
         else:
             states = ['g', 'e']
         for state in states:
@@ -294,6 +353,11 @@ class HistogramExperiment(Experiment):
                 q_f.append(q[0])
                 data_dict['if'] = list(i_f[0])
                 data_dict['qf'] = list(q_f[0])
+            if state=='h':
+                i_h.append(i[0])
+                q_h.append(q[0])
+                data_dict['ih'] = list(i_h[0])
+                data_dict['qh'] = list(q_h[0])
 
         # data_dict = {'ig': i_g[0], 'qg': q_g[0], 'ie': i_e[0], 'qe': q_e[0], 'if': i_f[0], 'qf': q_f[0]}
 

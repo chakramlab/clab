@@ -71,6 +71,10 @@ class fngnp1RabiProgram(AveragerProgram):
             gain=cfg.device.soc.resonator.gain,
             length=self.readout_length)
         
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.sb_sigma), length=self.us2cycles(self.cfg.sb_sigma) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.sb_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.sb_sigma) * 2, k=2, flat_top_fraction=0.0)
+        
         self.sync_all(self.us2cycles(0.2))
     
     def play_pige_pulse(self, phase = 0, shift = 0):
@@ -121,11 +125,7 @@ class fngnp1RabiProgram(AveragerProgram):
         
         self.pulse(ch=self.qubit_ch)   
 
-    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0):
-        
-        # why not add this inside the if statement?
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
-        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
+    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0):        
 
         if pulse_type == 'const':
             
@@ -141,7 +141,7 @@ class fngnp1RabiProgram(AveragerProgram):
         if pulse_type == 'flat_top':
             
             if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -151,8 +151,19 @@ class fngnp1RabiProgram(AveragerProgram):
                     length=self.us2cycles(length),
                     waveform="sb_flat_top_sin_squared")
 
+            elif ramp_type == 'bump':
+                # print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+
             elif ramp_type == 'gaussian':
-                print('Sideband flat top gaussian')
+                # print('Sideband flat top gaussian')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",

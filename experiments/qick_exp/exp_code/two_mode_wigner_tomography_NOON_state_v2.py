@@ -113,7 +113,12 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
         if cfg.expt.gen_ef_pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="theta_ef", sigma=self.sigma_gen_ef, length=self.sigma_gen_ef * 4)
 
-            
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma * 4))
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
+
+        
+        
         self.gen_ef_gain = cfg.expt.gen_ef_gain
 
         if not bool(self.gen_ef_gain):
@@ -231,39 +236,10 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
         
         self.pulse(ch=self.qubit_ch)
 
-    def play_cavity_drive(self, gain = 0, length = 1, phase = 0):
-                
-        if self.cavdr_pulse_type == 'const':
 
-            self.set_pulse_registers(
-                    ch=self.cavdr_ch, 
-                    style="const", 
-                    freq=self.freq2reg(self.cavdr_freq, gen_ch=self.cavdr_ch),
-                    phase=self.deg2reg(phase, gen_ch=self.cavdr_ch),
-                    gain=gain, 
-                    length= self.us2cycles(length))
-            
-        if self.cavdr_pulse_type == 'gauss':
-            
-            self.set_pulse_registers(
-                ch=self.cavdr_ch,
-                style="arb",
-                freq=self.freq2reg(self.cavdr_freq, gen_ch=self.cavdr_ch),
-                phase=self.deg2reg(phase,gen_ch=self.cavdr_ch),
-                gain=gain,
-                waveform="cavdr")
-        
-        self.pulse(ch=self.cavdr_ch)
+    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='bump', ramp_sigma=0.01, phase=0, shift=0):
 
-
-    
-    def play_sb(self, freq= 1, length=1, gain=1, ramp_type='sin_squared', ramp_sigma=0.01, phase=0, shift=0):
-        
-        # why not add this inside the if statement?
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
-        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(ramp_sigma) * 2)
-
-        if self.cfg.expt.sb_pulse_type == 'const':
+        if pulse_type == 'const':
             
             print('Sideband const')
             self.set_pulse_registers(
@@ -274,10 +250,10 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
                     gain=gain, 
                     length=self.us2cycles(length))
         
-        if self.cfg.expt.sb_pulse_type == 'flat_top':
+        if pulse_type == 'flat_top':
             
             if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
+                # print('Sideband flat top sin squared')
                 self.set_pulse_registers(
                     ch=self.sideband_ch,
                     style="flat_top",
@@ -287,6 +263,17 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
                     length=self.us2cycles(length),
                     waveform="sb_flat_top_sin_squared")
 
+            elif ramp_type == 'bump':
+                print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+                
             elif ramp_type == 'gaussian':
                 print('Sideband flat top gaussian')
                 self.set_pulse_registers(
@@ -299,8 +286,7 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
                     waveform="sb_flat_top_gaussian")
         
         self.pulse(ch=self.sideband_ch)
-
-
+        
     def body(self):
         # Phase reset all channels
         for ch in self.gen_chs.keys():
@@ -369,11 +355,12 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
             sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode1][i]
             sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode1][i]
             sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode1][i]
+            pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode1]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode1][i]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode1]
             print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
-            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
             self.sync_all()
 
             # Step (4 + 6i)
@@ -393,11 +380,12 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
             sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode2][i]
             sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode2][i]
             sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode2][i]
+            pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode2]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode2][i]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode2]
             print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
-            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
             self.sync_all()
 
 
@@ -405,24 +393,29 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
 
         # Cavity displacement
         
+        print('Playing gaussian cavity drives')
+        self.add_gauss(ch=self.cavdr_ch, name="cavdr1", sigma=self.us2cycles(self.cfg.expt.length), length=self.us2cycles(self.cfg.expt.length)* 4)
+        
         self.set_pulse_registers(
-            ch=self.cavdr_ch,
-            style="const",
-            freq=self.cavdr_freq,
-            phase=self.deg2reg(self.cavdr_phase, gen_ch=self.cavdr_ch),
-            gain=self.cavdr_gain,
-            length=self.cavdr_length)
+                ch=self.cavdr_ch,
+                style="arb",
+                freq=self.cavdr_freq,
+                phase=self.deg2reg(self.cavdr_phase,gen_ch=self.cavdr_ch),
+                gain=self.cavdr_gain,
+                waveform="cavdr1")
         
         self.pulse(ch=self.cavdr_ch)
         self.sync_all() 
+
+        self.add_gauss(ch=self.cavdr_ch, name="cavdr2", sigma=self.us2cycles(self.cfg.expt.length2), length=self.us2cycles(self.cfg.expt.length2)* 4)
         
         self.set_pulse_registers(
-            ch=self.cavdr_ch,
-            style="const",
-            freq=self.cavdr2_freq,
-            phase=self.deg2reg(self.cavdr2_phase, gen_ch=self.cavdr_ch),
-            gain=self.cavdr2_gain,
-            length=self.cavdr2_length)
+                ch=self.cavdr_ch,
+                style="arb",
+                freq=self.cavdr2_freq,
+                phase=self.deg2reg(self.cavdr2_phase,gen_ch=self.cavdr_ch),
+                gain=self.cavdr2_gain,
+                waveform="cavdr2")
         
         self.pulse(ch=self.cavdr_ch)
         self.sync_all() 
@@ -471,7 +464,7 @@ class WignerTomographyNOONStateProgram(AveragerProgram):
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
 
-        # Add two mode reset
+        print('Updated settings! 22')
 
 class WignerTomographyNOONStateExperiment(Experiment):
     """Qubit Spectroscopy Experiment

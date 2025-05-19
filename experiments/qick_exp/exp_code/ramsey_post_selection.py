@@ -20,6 +20,11 @@ class RamseyPostSelectionProgram(RAveragerProgram):
         self.r_wait = 3# self.sreg(self.qubit_ch, "time")
         self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
 
+        self.res_freq = cfg.device.soc.readout.freq
+        self.readout_ch = cfg.device.soc.readout.ch
+
+        self.readout_freq=self.freq2reg(self.res_freq, gen_ch=self.res_ch, ro_ch=self.readout_ch[0])  # convert frequency to dac frequency (ensuring it is an available adc frequency)
+
         self.r_phase2 = 4
         self.r_phase = self.sreg(self.qubit_ch, "phase")
         #self.r_phase = 0
@@ -154,7 +159,7 @@ class RamseyPostSelectionProgram(RAveragerProgram):
                 phase=self.deg2reg(0),
                 gain= self.piby2gain,
                 waveform="qubit")
-            print('Pulse type set to gauss')
+            print('Pulse type set to gauss for first pi/2 pulse')
 
         self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all()
@@ -173,22 +178,53 @@ class RamseyPostSelectionProgram(RAveragerProgram):
             self.pulse(ch=self.cfg.device.soc.resonator.ch)
             self.sync_all()
 
-        # Readout 
+        if self.cfg.expt.readout_reset:
+            print('Readout reset')
+            # Readout 
 
-        self.set_pulse_registers(
-            ch=self.cfg.device.soc.resonator.ch,
-            style="const",
-            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
-            phase=self.deg2reg(0),
-            gain=self.cfg.device.soc.resonator.gain,
-            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.resonator.gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
         
-        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+            self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
                      adcs=[0],
                      adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
-                     syncdelay=self.us2cycles(cfg.expt.wait_time))  # sync all channels
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.readout_reset_wait_time))  # sync all channels
+        
+            # Reset of readout cavity
+            self.set_pulse_registers(
+                ch=self.res_ch,
+                style="const",
+                freq=self.readout_freq, 
+                phase=self.deg2reg(cfg.device.soc.readout.readout_reset_phase, gen_ch=self.res_ch), # 0 degrees
+                gain=self.cfg.device.soc.readout.readout_reset_gain, 
+                length=self.us2cycles(cfg.device.soc.readout.readout_reset_length))
+            self.pulse(ch=self.res_ch)
+            self.sync_all(self.us2cycles(cfg.device.soc.readout.post_selection_wait_time))
 
+        else:
+
+            # Readout 
+
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.resonator.gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+            
+            self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                        adcs=[0],
+                        adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                        wait=True,
+                        syncdelay=self.us2cycles(cfg.device.soc.readout.post_selection_wait_time))  # sync all channels
+            
         # Play Ramsey and measure
         
         self.safe_regwi(self.q_rp, self.r_phase, 0)

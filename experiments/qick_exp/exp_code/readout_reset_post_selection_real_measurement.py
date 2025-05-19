@@ -219,7 +219,6 @@ class ReadoutResetPostSelectionRealMeasurementProgram(RAveragerProgram):
             self.play_pief_pulse()
             self.sync_all()
         
-
         # Do Ramsey
 
         self.safe_regwi(self.q_rp, self.r_phase, 0)

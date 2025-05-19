@@ -38,7 +38,9 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist)
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
-
+        self.add_gauss(ch=self.qubit_ch, name="qubit_fh", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_fh.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_fh.sigma) * 4)
+        self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma) * 4)
+        self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma) * 4)
         for ch in [0, 1]:  # configure the readout lengths and downconversion frequencies
             self.declare_readout(ch=ch, 
                                  length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
@@ -71,7 +73,7 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
 
         if self.cfg.device.soc.qubit.pulses.pi_ge.pulse_type == 'gauss':
 
-            self.add_gauss(ch=self.qubit_ch, name="qubit_ge", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ge.sigma) * 4)
+            
     
             self.set_pulse_registers(
                 ch=self.qubit_ch,
@@ -97,7 +99,7 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
         
         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
 
-            self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma), length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma) * 4)
+            
     
             self.set_pulse_registers(
                 ch=self.qubit_ch,
@@ -107,6 +109,34 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
                 gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
                 waveform="qubit_ef")
 
+        self.pulse(ch=self.qubit_ch)
+
+    def play_pifh_pulse(self, phase=0, shift=0):
+
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'const':
+            
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_fh + shift), 
+                phase=0,
+                gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain, 
+                length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_fh.sigma))
+        
+        if self.cfg.device.soc.qubit.pulses.pi_fh.pulse_type == 'gauss':
+            print('Playing gauss FH pulse')
+            print('Freq:', self.cfg.device.soc.qubit.f_fh + shift)
+            print('Sigma:', self.cfg.device.soc.qubit.pulses.pi_fh.sigma)
+            print('Gain:', self.cfg.device.soc.qubit.pulses.pi_fh.gain)
+    
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(self.cfg.device.soc.qubit.f_fh + shift),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.qubit.pulses.pi_fh.gain,
+                waveform="qubit_fh")
+            
         self.pulse(ch=self.qubit_ch)
 
     def body(self):
@@ -160,7 +190,16 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
             
         # Play pi_ge pulse
         self.play_pi_ge()
-        self.sync_all(self.us2cycles(0.05)) # align channels and wait 50ns
+        self.sync_all() 
+
+        # Play pi_fh pulse
+        self.play_pifh_pulse()
+        self.sync_all()
+
+        # Play pi_ef pulse
+
+        self.play_pi_ef()
+        self.sync_all()
 
         # Readout kick pulse
 
@@ -189,7 +228,7 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
         
         self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
                      adcs=[0],
-                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
         # self.measure(pulse_ch=self.res_ch, 
@@ -198,6 +237,8 @@ class PulseProbeFHSpectroscopyProgram(RAveragerProgram):
         #      adc_trig_offset=cfg.device.soc.readout.adc_trig_offset,
         #      wait=True,
         #      syncdelay=self.us2cycles(cfg.device.soc.readout.relax_delay))
+
+        
     
     def update(self):
         self.mathi(self.q_rp, self.r_freq2, self.r_freq2, '+', self.f_step) # update frequency list index
@@ -223,14 +264,22 @@ class PulseProbeFHSpectroscopyExperiment(Experiment):
         x_pts, avgi, avgq = qspec_ef.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
         # x_pts, avgi, avgq = qspec_ef.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)        
         
-        data={'xpts':x_pts, 'avgi':avgi, 'avgq':avgq}
-        
-        self.data=data
+        # Calibrate qubit probability
 
-        data_dict = {'xpts':data['xpts'], 'avgi':data['avgi'][0][0], 'avgq':data['avgq'][0][0]}
+        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+    
+        i_prob, q_prob = self.get_qubit_prob(avgi[0][0], avgq[0][0], iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+
+        data_dict = {'xpts': x_pts, 'avgq':avgq[0][0], 'avgi':avgi[0][0], 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        
+        self.data=data_dict
+
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
-        return data
+
+        
+
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:
