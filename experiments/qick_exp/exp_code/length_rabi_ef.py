@@ -399,10 +399,10 @@ class LengthRabiEFExperiment(Experiment):
             data["amps"].append(amp)
             data["phases"].append(phase)
 
-        for k, a in data.items():
-            data[k] = np.array(a)
+        # for k, a in data.items():
+        #     data[k] = np.array(a)
 
-        self.data = data
+        # self.data = data
 
         avgi_col = np.array([data["avgi"][i][0][0] for i in range(len(data['avgi']))])
         avgq_col = np.array([data["avgq"][i][0][0] for i in range(len(data['avgq']))])

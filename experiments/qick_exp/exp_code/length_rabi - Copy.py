@@ -5,14 +5,14 @@ from tqdm import tqdm_notebook as tqdm
 from qick import *
 from slab import Experiment, dsfit, AttrDict
 
-class LengthRabiProgram(AveragerProgram):
+class CarrierPhaseCalibrationProgram(AveragerProgram):
     def initialize(self):
         cfg = AttrDict(self.cfg)
         self.cfg.update(cfg.expt)
         
         self.res_ch = cfg.device.soc.resonator.ch
         self.qubit_ch = cfg.device.soc.qubit.ch
-        self.qubit_resolved_ch = cfg.device.soc.qubit.pulses.pi_ge_resolved.ch
+        
         self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
         # self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
         
@@ -96,34 +96,27 @@ class LengthRabiProgram(AveragerProgram):
 
     def body(self):
         cfg=AttrDict(self.cfg)
+        
+           
+        self.set_pulse_registers(
+            ch=self.qubit_ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.expt.freq),
+            phase=0,
+            gain=self.cfg.expt.gain,
+            length=self.us2cycles(self.cfg.expt.length))
+        self.pulse(ch=self.qubit_ch)
 
-        if self.cfg.expt.resolved_channel:
-            channel = self.qubit_resolved_ch
-        else:
-            channel = self.qubit_ch
+        self.set_pulse_registers(
+            ch=self.sideband_ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.expt.freq),
+            phase=0,
+            gain=self.cfg.expt.gain,
+            length=self.us2cycles(self.cfg.expt.length))
+        self.pulse(self.sideband_ch)
 
-        print('Qubit channel:', channel)
-        if self.cfg.length_placeholder != 0:
-            if self.cfg.expt.pulse_type == "gauss":
-                self.add_gauss(ch=channel, name="qubit", sigma=self.sigma_test, length=self.sigma_test*4)
-                self.set_pulse_registers(
-                    ch=channel,
-                    style="arb",
-                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-                    phase=0,
-                    gain=self.cfg.expt.gain,
-                    waveform="qubit")
-            elif self.cfg.expt.pulse_type == "const":
-                self.set_pulse_registers(
-                    ch=channel,
-                    style="const",
-                    freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
-                    phase=0,
-                    gain=self.cfg.expt.gain,
-                    length=self.sigma_test)
-                    
-            self.pulse(ch=channel)
-            self.sync_all()
+        self.sync_all()
             
         # Readout kick pulse
 
@@ -156,73 +149,73 @@ class LengthRabiProgram(AveragerProgram):
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
         
-        print('Readout relax delay (us)', self.cfg.device.soc.readout.relax_delay)
+        # print('Readout relax delay (us)', self.cfg.device.soc.readout.relax_delay)
 
-        # Transmon Reset
+        # # Transmon Reset
 
-        if cfg.expt.reset:
+        # if cfg.expt.reset:
             
-            print('Initiating transmon reset')
+        #     print('Initiating transmon reset')
             
-            for ii in range(cfg.device.soc.readout.reset_cycles):
-                # print('Resetting System,', 'Cycle', ii)
+        #     for ii in range(cfg.device.soc.readout.reset_cycles):
+        #         # print('Resetting System,', 'Cycle', ii)
 
-                # f0g1 to readout mode
+        #         # f0g1 to readout mode
 
-                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
-                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
-                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
-                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
-                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
-                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        #         sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+        #         sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+        #         sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+        #         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+        #         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+        #         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+        #         # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
-                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
-                self.sync_all()
+        #         self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+        #         self.sync_all()
 
-                # pi_ef
+        #         # pi_ef
 
-                if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
+        #         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
 
-                    self.set_pulse_registers(
-                        ch=self.qubit_ch,
-                        style="const",
-                        freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
-                        phase=self.deg2reg(0),
-                        gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
-                        length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
+        #             self.set_pulse_registers(
+        #                 ch=self.qubit_ch,
+        #                 style="const",
+        #                 freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+        #                 phase=self.deg2reg(0),
+        #                 gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+        #                 length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
                 
-                if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+        #         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
 
-                    self.set_pulse_registers(
-                        ch=self.qubit_ch,
-                        style="arb",
-                        freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
-                        phase=self.deg2reg(0),
-                        gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
-                        waveform="pi_ef")
+        #             self.set_pulse_registers(
+        #                 ch=self.qubit_ch,
+        #                 style="arb",
+        #                 freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+        #                 phase=self.deg2reg(0),
+        #                 gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+        #                 waveform="pi_ef")
 
-                self.pulse(ch=self.qubit_ch)
-                self.sync_all()
+        #         self.pulse(ch=self.qubit_ch)
+        #         self.sync_all()
 
-                # f0g1 to readout mode
+        #         # f0g1 to readout mode
 
-                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
-                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
-                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
-                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
-                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
-                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        #         sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+        #         sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+        #         sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+        #         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+        #         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+        #         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+        #         # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
-                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
-                self.sync_all()
+        #         self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+        #         self.sync_all()
             
-            self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
+        #     self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
         
         
         
-class LengthRabiExperiment(Experiment):
+class CarrierPhaseCalibrationExperiment(Experiment):
     """Length Rabi Experiment
        Experimental Config
        expt_cfg={

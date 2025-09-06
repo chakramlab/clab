@@ -77,7 +77,7 @@ class ECDCharacteristicFunctionProgram(AveragerProgram):
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2)
         self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2, k=2, flat_top_fraction=0.0)
 
-        print('Ramp sigma (us):', self.cfg.expt.sb_sigma)
+        # print('Ramp sigma (us):', self.cfg.expt.sb_sigma)
 
         # Cavity drive parameters
         self.cavdr_ch=cfg.device.soc.storage.ch
@@ -363,8 +363,36 @@ class ECDCharacteristicFunctionProgram(AveragerProgram):
 
             self.sync_all(self.us2cycles(self.cfg.device.soc.readout.reset_cavity_beginning_relax_delay))
 
-        self.play_pi2ge_pulse(phase=0)
+        # Put n photons into cavity
+
+        self.chi_e = self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode]
+        self.chi_f = self.cfg.device.soc.storage.chi_f[self.cfg.expt.mode]
+        self.chi_ef = self.chi_f - self.chi_e
+        
+        print('Initializing cavity to |' + str(cfg.expt.n) + '>')
+        for i in np.arange(cfg.expt.n):
+            
+            self.play_pige_pulse(shift = self.chi_e*i)
+            self.sync_all()
+
+            self.play_pief_pulse(shift = self.chi_ef*i)
+            self.sync_all()
+
+            sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][i]
+            sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][i]
+            sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][i]
+            sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
+            sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
+            sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+            # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+
+            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+            self.sync_all()
+
+        self.play_pi2ge_pulse(phase=-90)
         self.sync_all()
+
+        # ECD Sequence
 
         print('Cavity drive freq. (MHz):', self.cfg.device.soc.storage.freqs[self.cfg.expt.mode]+self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode]/2)
         self.play_cavity_drive(gain = self.cfg.expt.cavity_drive_gains_temp, phase = 0)  # Drive at average of the cavity freq. when in |g> or |e>
@@ -381,33 +409,59 @@ class ECDCharacteristicFunctionProgram(AveragerProgram):
         else:
             print('No pulse length specified')
 
-        r_factor = np.cos(chi_e/4*(3*pulse_length+2*self.cfg.expt.wait_time))/np.cos(chi_e/4*pulse_length)
+        r_factor = np.cos(np.pi*chi_e*(self.cfg.expt.wait_time))
         return_gain = int(r_factor * self.cfg.expt.cavity_drive_gains_temp)
-        print('r_factor:', r_factor)
-        print('Return gain:', return_gain)
+        print('r_factor (pulse 2):', r_factor)
+        print('Return gain (pulse 2):', return_gain)
 
         self.play_cavity_drive(gain = return_gain, phase = 180)
         self.sync_all()
+
+        self.play_pige_pulse()  # Flip qubit to echo spurious terms
+        self.sync_all()
+
+        r_factor = np.cos(np.pi*chi_e*(self.cfg.expt.wait_time))
+        return_gain = int(r_factor * self.cfg.expt.cavity_drive_gains_temp)
+        print('r_factor (pulse 3):', r_factor)
+        print('Return gain (pulse 3):', return_gain)
+
         self.play_cavity_drive(gain = return_gain, phase = 180)
         self.sync_all(self.us2cycles(self.cfg.expt.wait_time))
 
-        self.play_cavity_drive(gain = self.cfg.expt.cavity_drive_gains_temp, phase = 0)
-        self.sync_all()
+        r_factor = np.cos(np.pi*chi_e*(2*self.cfg.expt.wait_time))
+        return_gain = int(r_factor * self.cfg.expt.cavity_drive_gains_temp)
+        print('r_factor (pulse 4):', r_factor)
+        print('Return gain (pulse 4):', return_gain)
 
+        self.play_cavity_drive(gain = return_gain, phase = 0)
+        self.sync_all()
+        
         # Qubit tomography 
+
+        self.chi_e = self.cfg.device.soc.storage.chi_e[self.cfg.expt.mode]
+        self.chi_f = self.cfg.device.soc.storage.chi_f[self.cfg.expt.mode]
+        self.chi_ef = self.chi_f - self.chi_e
+        
+        if self.cfg.expt.shift_qubit:
+            gain = self.cfg.expt.cavity_drive_gains_temp
+            n = (gain * self.cfg.expt.beta_gain_factor / 2)**2
+        else:
+            n=0
+
+        print('Photon n:', n)
 
         if self.cfg.expt.tomography_pulse_type_temp == 'pi2_x':
 
             print('Playing pi2_x pulse')
 
-            self.play_pi2ge_pulse(phase=0)
+            self.play_pi2ge_pulse(phase=0, shift=n*self.chi_e)
             self.sync_all()  
     
         elif self.cfg.expt.tomography_pulse_type_temp == 'pi2_y':
             
             print('Playing pi2_y pulse')
 
-            self.play_pi2ge_pulse(phase=90)
+            self.play_pi2ge_pulse(phase=90, shift=n*self.chi_e)
             self.sync_all()  
 
         # Readout kick pulse
@@ -606,7 +660,7 @@ class ECDCharacteristicFunctionProgram(AveragerProgram):
         
 class ECDCharacteristicFunctionExperiment(Experiment):
     """Length Rabi Experiment
-       Experimental Config
+       Experimental Config  
        expt_cfg={
        "start": start length, 
        "step": length step, 
@@ -629,15 +683,18 @@ class ECDCharacteristicFunctionExperiment(Experiment):
         avgi_pi2_y_col = []
         avgq_pi2_y_col = []
 
-        for ii in tqdm(self.cfg.expt.cavity_drive_gains, disable=not progress):
-            
-            self.cfg.expt.cavity_drive_gains_temp = ii 
-            self.cfg.expt.tomography_pulse_type_temp = 'I' 
-            soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            lenrabi = ECDCharacteristicFunctionProgram(soc, self.cfg)       
-            avgi,avgq=lenrabi.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)
-            avgi_col.append(avgi[0][0])
-            avgq_col.append(avgq[0][0])
+        if self.cfg.expt.sigma_z:
+            for ii in tqdm(self.cfg.expt.cavity_drive_gains, disable=not progress):
+                
+                self.cfg.expt.cavity_drive_gains_temp = ii 
+                self.cfg.expt.tomography_pulse_type_temp = 'I' 
+                soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
+                lenrabi = ECDCharacteristicFunctionProgram(soc, self.cfg)       
+                avgi,avgq=lenrabi.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)
+                avgi_col.append(avgi[0][0])
+                avgq_col.append(avgq[0][0])
+        else:
+            print('Not measuring sigma_z.')
 
         for ii in tqdm(self.cfg.expt.cavity_drive_gains, disable=not progress):
 

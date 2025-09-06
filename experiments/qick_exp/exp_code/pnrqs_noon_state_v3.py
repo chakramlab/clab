@@ -403,7 +403,7 @@ class PNRQSNOONStateProgram(AveragerProgram):
         
         self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
                      adcs=[0],
-                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
         

@@ -381,7 +381,7 @@ class ECDDisplacementAreaCalibrationProgram(AveragerProgram):
         else:
             print('No pulse length specified')
 
-        r_factor = np.cos(chi_e/4*(3*pulse_length+2*self.cfg.expt.wait_time))/np.cos(chi_e/4*pulse_length)
+        r_factor = np.cos(np.pi*chi_e/2*(3*pulse_length+2*self.cfg.expt.wait_time))/np.cos(np.pi*chi_e/2*pulse_length)
         return_gain = int(r_factor * self.cfg.expt.cavity_drive_gains_temp)
         print('r_factor:', r_factor)
         print('Return gain:', return_gain)

@@ -7,7 +7,7 @@ from slab import Experiment, dsfit, AttrDict
 from tqdm import tqdm_notebook as tqdm
 
 
-class f0g1SidebandRamseyV2Program(AveragerProgram):
+class f0g1SidebandRamseyV2PNRQSTestProgram(AveragerProgram):
     def initialize(self):
         cfg = AttrDict(self.cfg)
         self.cfg.update(cfg.expt)
@@ -55,9 +55,14 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         # self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.ramp_sigma), length=self.us2cycles(self.cfg.expt.ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.ramp_sigma) * 2)
         self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
+
         self.add_bump_func_freq_modulation(ch=self.sideband_ch, name='sb_flat_top_bump_freq_mod', ramp_length=self.us2cycles(self.cfg.expt.ramp_sigma), 
                                            flat_top_length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][self.cfg.expt.n]), k=2, 
                                            freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
+        
+        self.sigma_ge_resolved = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma, gen_ch=self.qubit_ch)
+        self.add_gauss(ch=self.qubit_ch, name="qubit_ge_resolved", sigma=self.sigma_ge_resolved, length=self.sigma_ge_resolved * 4)
+
         self.sync_all(self.us2cycles(0.2))
     
     def play_pige(self, phase = 0, shift = 0):
@@ -263,30 +268,30 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         else:
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, phase=self.cfg.expt.phase_offset)
         
-        self.sync_all(self.us2cycles(cfg.expt.tau_placeholder))
+        self.sync_all(self.us2cycles(0))
 
-        # setup and play fngnp1 sideband pi pulse
+        # # setup and play fngnp1 sideband pi pulse
 
-        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n]
-        sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][self.cfg.expt.n]
-        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n]
-        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
-        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n]
-        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-        print('ramsey: Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        # sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n]
+        # sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][self.cfg.expt.n]
+        # sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n]
+        # sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
+        # sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n]
+        # sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+        # print('ramsey: Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
 
-        if self.cfg.device.soc.sideband.drive_frame_stark_shift_correction:
-            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, stark_shift_idle_correction=True, phase=-self.cfg.expt.phase_offset)
-        else:
-            self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, phase=-self.cfg.expt.phase_offset)
+        # if self.cfg.device.soc.sideband.drive_frame_stark_shift_correction:
+        #     self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, stark_shift_idle_correction=True, phase=-self.cfg.expt.phase_offset)
+        # else:
+        #     self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, phase=-self.cfg.expt.phase_offset)
         
-        self.sync_all()
+        # self.sync_all()
 
-        self.play_pief_pulse(shift=chi_ef*self.cfg.expt.n)
-        self.sync_all()
+        # self.play_pief_pulse(shift=chi_ef*self.cfg.expt.n)
+        # self.sync_all()
         
-        self.play_piby2ge(phase=cfg.expt.phase_placeholder, shift=chi_e*self.cfg.expt.n)
-        self.sync_all()
+        # self.play_piby2ge(phase=cfg.expt.phase_placeholder, shift=chi_e*self.cfg.expt.n)
+        # self.sync_all()
 
         if self.cfg.expt.reset_f:
             # f0g1 to readout mode
@@ -301,6 +306,33 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
+
+        # PNRQS 
+        
+        self.qubit_pulsetype = cfg['device']['soc']['qubit']['pulses']['pi_ge_resolved']['pulse_type']
+
+        if self.qubit_pulsetype == 'gauss':
+
+            self.set_pulse_registers(
+                ch=self.qubit_ch,
+                style="arb",
+                freq=self.freq2reg(cfg.expt.freq_temp),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain,
+                waveform="qubit_ge_resolved")
+        
+        if self.qubit_pulsetype == 'const':
+            self.set_pulse_registers(
+                    ch=self.qubit_ch, 
+                    style="const", 
+                    freq=self.freq2reg(cfg.expt.freq_temp),
+                    phase=self.deg2reg(0),
+                    gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain, 
+                    length=self.sigma_ge_resolved)
+            
+        self.pulse(ch=self.qubit_ch)
+
+        self.sync_all()
 
         # Readout kick pulse
 
@@ -439,7 +471,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
             
             self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
-class f0g1SidebandRamseyV2Experiment(Experiment):
+class f0g1SidebandRamseyV2PNRQSTestExperiment(Experiment):
     """Ramsey Echo Experiment
        Experimental Config
         expt = {"start":0, "step": 1, "expts":200, "reps": 10, "rounds": 200, "phase_step": deg2reg(360/50), "echo_times": 1,
@@ -452,17 +484,14 @@ class f0g1SidebandRamseyV2Experiment(Experiment):
 
     def acquire(self, progress=False, data_path=None, filename=None):
         
-        ramsey_freq = self.cfg.expt.phase_step/self.cfg.expt.step/360
         x_pts = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
-        phase_steps = self.cfg.expt["start"]*360*ramsey_freq + self.cfg.expt['phase_step']*np.arange(self.cfg.expt["expts"])
     
         avgi_col = []
         avgq_col = []
         for i in tqdm(np.arange(len(x_pts)), disable = not progress):
-            self.cfg.expt.tau_placeholder = x_pts[i]
-            self.cfg.expt.phase_placeholder = phase_steps[i]
+            self.cfg.expt.freq_temp = x_pts[i]
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            ramsey_echo = f0g1SidebandRamseyV2Program(soc, self.cfg)
+            ramsey_echo = f0g1SidebandRamseyV2PNRQSTestProgram(soc, self.cfg)
             avgi, avgq = ramsey_echo.acquire(self.im[self.cfg.aliases.soc], threshold=None, load_pulses=True,
                                                     progress=False)
             avgi_col.append(avgi[0][0])

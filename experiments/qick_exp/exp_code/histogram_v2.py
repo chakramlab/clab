@@ -50,8 +50,8 @@ class HistogramProgram(RAveragerProgram):
             self.add_gauss(ch=self.qubit_ch, name="qubit_fh", sigma=self.sigma_fh, length=self.sigma_fh * 4)
         self.sideband_ch = cfg.device.soc.sideband.ch
         self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.device.soc.sideband.nyqist)
-        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
-        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2)
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]), length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]) * 2)
 
         
         

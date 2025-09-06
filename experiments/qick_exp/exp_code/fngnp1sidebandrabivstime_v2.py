@@ -124,8 +124,27 @@ class fngnp1RabiProgram(AveragerProgram):
         
         self.pulse(ch=self.qubit_ch)   
 
-    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0):        
+    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0, stark_shift_idle_correction=False):        
 
+        if stark_shift_idle_correction:
+
+            self.add_bump_func_freq_modulation(ch=self.sideband_ch, name='sb_flat_top_bump_freq_mod', ramp_length=self.us2cycles(self.cfg.expt.sb_sigma), 
+                                            flat_top_length=self.us2cycles(length), k=2, 
+                                            freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
+            
+            if pulse_type == 'flat_top':
+
+                if ramp_type == 'bump':
+                    print('Sideband flat top bump with freq. modulation')
+                    print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
+                    self.set_pulse_registers(
+                        ch=self.sideband_ch,
+                        style="arb",
+                        freq=self.freq2reg(freq + shift - self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n]),
+                        phase=self.deg2reg(phase),
+                        gain=gain,
+                        waveform="sb_flat_top_bump_freq_mod")
+                    
         if pulse_type == 'const':
             
             print('Sideband const')
@@ -253,7 +272,11 @@ class fngnp1RabiProgram(AveragerProgram):
         # fngnp1 vs time pulse
 
         # print('probe ramp sigma', self.cfg.expt.sb_sigma)
-        self.play_sb(freq=cfg.expt.freq, length=self.sigma_fngnp1, gain=cfg.expt.gain, pulse_type=self.cfg.expt.fngnp1_pulse_type, ramp_type=self.cfg.expt.flat_top_type, ramp_sigma=self.cfg.expt.sb_sigma, phase=0)
+
+        if self.cfg.expt.stark_shift_idle_correction:
+            self.play_sb(freq=cfg.expt.freq, length=self.sigma_fngnp1, gain=cfg.expt.gain, pulse_type=self.cfg.expt.fngnp1_pulse_type, ramp_type=self.cfg.expt.flat_top_type, ramp_sigma=self.cfg.expt.sb_sigma, phase=0, stark_shift_idle_correction=True)
+        else:
+            self.play_sb(freq=cfg.expt.freq, length=self.sigma_fngnp1, gain=cfg.expt.gain, pulse_type=self.cfg.expt.fngnp1_pulse_type, ramp_type=self.cfg.expt.flat_top_type, ramp_sigma=self.cfg.expt.sb_sigma, phase=0)
         self.sync_all()
 
         if cfg.expt.add_pi_ef:

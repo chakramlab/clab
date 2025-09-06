@@ -1,0 +1,267 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm_notebook as tqdm
+
+from qick import *
+from slab import Experiment, dsfit, AttrDict
+
+class CarrierPhaseCalibrationProgram(AveragerProgram):
+    def initialize(self):
+        cfg = AttrDict(self.cfg)
+        self.cfg.update(cfg.expt)
+        
+        self.res_ch = cfg.device.soc.resonator.ch
+        self.qubit_ch = cfg.device.soc.qubit.ch
+        
+        self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
+        # self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
+        
+        self.f_res=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])            # conver f_res to dac register value
+        self.readout_length= self.us2cycles(self.cfg.device.soc.readout.length)
+ 
+
+
+        self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist)
+        self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.expt.nyquist)
+
+
+        for ch in [0]:  # configure the readout lengths and downconversion frequencies
+            self.declare_readout(ch=ch, 
+                                 length=self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                                 freq=cfg.device.soc.readout.freq, 
+                                 gen_ch=self.cfg.device.soc.resonator.ch)
+        
+        # add qubit and readout pulses to respective channels
+        
+        self.set_pulse_registers(
+            ch=self.res_ch,
+            style="const",
+            freq=self.f_res,
+            phase=self.deg2reg(cfg.device.soc.resonator.phase, gen_ch=self.res_ch),
+            gain=cfg.device.soc.resonator.gain,
+            length=self.readout_length)
+            
+        self.sideband_ch = cfg.device.soc.sideband.ch
+        self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.expt.nyquist)
+
+        self.sync_all(self.us2cycles(0.2))
+
+    def body(self):
+        cfg=AttrDict(self.cfg)
+        
+        # Phase reset all channels
+
+        for ch in self.gen_chs.keys():
+            if ch != 4:
+                print('Channel phase reset:', ch)
+                self.setup_and_pulse(ch=ch, style='const', freq=self.freq2reg(100), phase=0, gain=100, length=self.us2cycles(.05), phrst=1)
+
+        self.sync_all(100)
+
+           
+        self.set_pulse_registers(
+            ch=self.qubit_ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.expt.freq),
+            phase=self.deg2reg(0),
+            gain=self.cfg.expt.gain,
+            length=self.us2cycles(self.cfg.expt.length))
+        self.pulse(ch=self.qubit_ch)
+
+        self.set_pulse_registers(
+            ch=self.sideband_ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.expt.freq),
+            phase=self.deg2reg(self.cfg.expt.phase),
+            gain=self.cfg.expt.gain,
+            length=self.us2cycles(self.cfg.expt.length))
+        self.pulse(self.sideband_ch)
+
+        self.sync_all()
+            
+        # Readout kick pulse
+
+        if self.cfg.device.soc.readout.kick_pulse:
+            # print('Playing kick pulse')
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Readout 
+
+        self.set_pulse_registers(
+            ch=self.cfg.device.soc.resonator.ch,
+            style="const",
+            freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+            phase=self.deg2reg(0),
+            gain=self.cfg.device.soc.resonator.gain,
+            length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        
+        self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                     adcs=[0],
+                     adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                     wait=True,
+                     syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
+        
+        # print('Readout relax delay (us)', self.cfg.device.soc.readout.relax_delay)
+
+        # # Transmon Reset
+
+        # if cfg.expt.reset:
+            
+        #     print('Initiating transmon reset')
+            
+        #     for ii in range(cfg.device.soc.readout.reset_cycles):
+        #         # print('Resetting System,', 'Cycle', ii)
+
+        #         # f0g1 to readout mode
+
+        #         sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+        #         sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+        #         sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+        #         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+        #         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+        #         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+        #         # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+        #         self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+        #         self.sync_all()
+
+        #         # pi_ef
+
+        #         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
+
+        #             self.set_pulse_registers(
+        #                 ch=self.qubit_ch,
+        #                 style="const",
+        #                 freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+        #                 phase=self.deg2reg(0),
+        #                 gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+        #                 length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
+                
+        #         if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+
+        #             self.set_pulse_registers(
+        #                 ch=self.qubit_ch,
+        #                 style="arb",
+        #                 freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+        #                 phase=self.deg2reg(0),
+        #                 gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+        #                 waveform="pi_ef")
+
+        #         self.pulse(ch=self.qubit_ch)
+        #         self.sync_all()
+
+        #         # f0g1 to readout mode
+
+        #         sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+        #         sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+        #         sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+        #         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+        #         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+        #         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+        #         # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+        #         self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+        #         self.sync_all()
+            
+        #     self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
+        
+        
+        
+class CarrierPhaseCalibrationExperiment(Experiment):
+    """Length Rabi Experiment
+       Experimental Config
+       expt_cfg={
+       "start": start length, 
+       "step": length step, 
+       "expts": number of different length experiments, 
+       "reps": number of reps,
+       "gain": gain to use for the pulse
+       "length_placeholder": used for iterating over lengths, initial specified value does not matter
+        } 
+    """
+
+    def __init__(self, path='', prefix='LengthRabi', config_file=None, progress=None):
+        super().__init__(path=path,prefix=prefix, config_file=config_file, progress=progress)
+
+    def acquire(self, progress=False, data_path=None, filename=None, prob_calib=True):
+        lengths = np.zeros(self.cfg.expt.expts)
+        soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
+        data={"xpts":[], "avgi":[], "avgq":[], "amps":[], "phases":[]}
+        for length in tqdm(lengths, disable=not progress):
+            lenrabi = CarrierPhaseCalibrationProgram(soc, self.cfg)
+            self.prog=lenrabi
+            avgi,avgq=lenrabi.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)
+            amp=np.abs(avgi[0][0]+1j*avgq[0][0]) # Calculating the magnitude
+            phase=np.angle(avgi[0][0]+1j*avgq[0][0]) # Calculating the phase
+            data["xpts"].append(lengths)
+            data["avgi"].append(avgi)
+            data["avgq"].append(avgq)
+            data["amps"].append(amp)
+            data["phases"].append(phase)
+
+        # for k, a in data.items():
+        #     data[k]=np.array(a)
+        
+        # self.data = data
+
+        # avgq_col = np.array([data['avgq'][i][0][0] for i in np.arange(len(data['avgq']))])
+        # avgi_col = np.array([data['avgi'][i][0][0] for i in np.arange(len(data['avgi']))])
+
+        # if prob_calib:
+
+        #     # Calibrate qubit probability
+
+        #     iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
+        #     i_prob, q_prob = self.get_qubit_prob(avgi_col, avgq_col, iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
+        #     data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col, 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        
+        # else:
+
+        #     data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col}
+
+        # if data_path and filename:
+        #     self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
+
+        # return data
+
+    def analyze(self, data=None, **kwargs):
+        if data is None:
+            data=self.data
+        
+        # ex: fitparams=[1.5, 1/(2*15000), -np.pi/2, 1e8, -13, 0]
+        pI = dsfit.fitdecaysin(data['xpts'][0],
+                               np.array([data["avgi"][i][0][0] for i in range(len(data['avgi']))]),
+                               fitparams=None, showfit=False)
+        pQ = dsfit.fitdecaysin(data['xpts'][0],
+                               np.array([data["avgq"][i][0][0] for i in range(len(data['avgq']))]),
+                               fitparams=None, showfit=False)
+        # adding this due to extra parameter in decaysin that is not in fitdecaysin
+        pI = np.append(pI, data['xpts'][0][0])
+        pQ = np.append(pQ, data['xpts'][0][0]) 
+        data['fiti'] = pI
+        data['fitq'] = pQ
+        
+        return data
+
+    def display(self, data=None, **kwargs):
+        if data is None:
+            data=self.data 
+        print(self.fname)
+        plt.figure(figsize=(10,8))
+        plt.subplot(211,title="Length Rabi",  ylabel="I")
+        plt.plot(data["xpts"][0], [data["avgi"][i][0][0] for i in range(len(data['avgi']))],'o-')
+        plt.subplot(212, xlabel="Time (us)", ylabel="Q")
+        plt.plot(data["xpts"][0], [data["avgq"][i][0][0] for i in range(len(data['avgq']))],'o-')
+        plt.tight_layout()
+        plt.show()
+
+

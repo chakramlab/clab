@@ -5,14 +5,14 @@ from tqdm import tqdm_notebook as tqdm
 from qick import *
 from slab import Experiment, dsfit, AttrDict
 
-class LengthRabiProgram(AveragerProgram):
+class LengthRabiPulseTestProgram(AveragerProgram):
     def initialize(self):
         cfg = AttrDict(self.cfg)
         self.cfg.update(cfg.expt)
         
         self.res_ch = cfg.device.soc.resonator.ch
-        self.qubit_ch = cfg.device.soc.qubit.ch
-        self.qubit_resolved_ch = cfg.device.soc.qubit.pulses.pi_ge_resolved.ch
+        self.qubit_ch = cfg.device.soc.qubit.pulses.pi_ge_resolved.ch
+        print('Qubit channel:', self.qubit_ch)
         self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
         # self.r_gain = self.sreg(self.qubit_ch, "gain")   # get gain register for qubit_ch    
         
@@ -96,18 +96,11 @@ class LengthRabiProgram(AveragerProgram):
 
     def body(self):
         cfg=AttrDict(self.cfg)
-
-        if self.cfg.expt.resolved_channel:
-            channel = self.qubit_resolved_ch
-        else:
-            channel = self.qubit_ch
-
-        print('Qubit channel:', channel)
         if self.cfg.length_placeholder != 0:
             if self.cfg.expt.pulse_type == "gauss":
-                self.add_gauss(ch=channel, name="qubit", sigma=self.sigma_test, length=self.sigma_test*4)
+                self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.sigma_test, length=self.sigma_test*4)
                 self.set_pulse_registers(
-                    ch=channel,
+                    ch=self.qubit_ch,
                     style="arb",
                     freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
                     phase=0,
@@ -115,14 +108,14 @@ class LengthRabiProgram(AveragerProgram):
                     waveform="qubit")
             elif self.cfg.expt.pulse_type == "const":
                 self.set_pulse_registers(
-                    ch=channel,
+                    ch=self.qubit_ch,
                     style="const",
                     freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
                     phase=0,
                     gain=self.cfg.expt.gain,
                     length=self.sigma_test)
                     
-            self.pulse(ch=channel)
+            self.pulse(ch=self.qubit_ch)
             self.sync_all()
             
         # Readout kick pulse
@@ -222,7 +215,7 @@ class LengthRabiProgram(AveragerProgram):
         
         
         
-class LengthRabiExperiment(Experiment):
+class LengthRabiPulseTestExperiment(Experiment):
     """Length Rabi Experiment
        Experimental Config
        expt_cfg={
@@ -244,7 +237,7 @@ class LengthRabiExperiment(Experiment):
         data={"xpts":[], "avgi":[], "avgq":[], "amps":[], "phases":[]}
         for length in tqdm(lengths, disable=not progress):
             self.cfg.expt.length_placeholder = length
-            lenrabi = LengthRabiProgram(soc, self.cfg)
+            lenrabi = LengthRabiPulseTestProgram(soc, self.cfg)
             self.prog=lenrabi
             avgi,avgq=lenrabi.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)
             amp=np.abs(avgi[0][0]+1j*avgq[0][0]) # Calculating the magnitude
