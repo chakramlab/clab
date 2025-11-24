@@ -1,0 +1,18 @@
+{
+    "qubit": {
+        "LOFrequencies": [
+            5000000000.0
+        ],
+        "IFFrequencies": [
+            5000000.0
+        ]
+    },
+    "resonator": {
+        "IFFrequencies": [
+            200000000
+        ],
+        "LOFrequencies": [
+            7000000000.0
+        ]
+    }
+}

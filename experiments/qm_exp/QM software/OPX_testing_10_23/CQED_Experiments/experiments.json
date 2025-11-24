@@ -1,0 +1,43 @@
+{
+    "resspec" : {
+        "IF frequency range (Hz)" : [200e6, 201e6],
+        "frequency intervals (Hz)" : 1e6,
+        "reset time (ns)" : 60e3,
+        "averages" : 1000000,
+        "args" : []
+    },
+    "qubitspec" : {
+        "IF frequency range (Hz)" : [25e6, 26e6],
+        "frequency intervals (Hz)" : 1e6,
+        "Tpi" : 15e3,
+        "reset time (ns)" : 60e3,
+        "averages" : 10000,
+        "args" : []
+    },
+    "rabi1d" : {
+        "time range (ns)" : [50, 500],
+        "time interval (ns)" : 50,
+        "T1 time (ns)" : 35e3,
+        "reset time (units of T1 time)" : 2,
+        "Tpi" : 130e3,
+        "averages" : 10
+    },
+    "T1" : {
+        "time range (ns)" : [4, 50000],
+        "time interval (ns)" : 1250,
+        "T1 time (ns)" : 35e3,
+        "Tpi (ns)" : 224,
+        "reset time (units of T1 time)" : 5,
+        "averages" : 50000
+    },
+    "ramsey" : {
+        "time range (ns)" : [4, 50000],
+        "time interval (ns)" : 1250,
+        "T1 time (ns)" : 35e3,
+        "reset time (units of T1 time)" : 5,
+        "ramsey frequency (Hz)": 120e6,
+        "Tpi (ns)" : 448,
+        "averages" : 50000
+    }
+    
+}

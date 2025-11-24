@@ -1,0 +1,156 @@
+2025.06.25 17:28:47.785 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:28:47.796 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:28:47.798 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:28:47.799 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:28:47.799 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:28:47.799 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:28:47.799 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:28:47.809 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:28:47.815 | laboneq.compiler.scheduler.scheduler          | INFO   Phase reset in section 'shots' has extended the section's timing grid to 40.00 ns, so to be commensurate with the local oscillator.
+2025.06.25 17:28:47.815 | laboneq.compiler.scheduler.scheduler          | INFO   Phase reset in section 'spect_sweep' has extended the section's timing grid to 40.00 ns, so to be commensurate with the local oscillator.
+2025.06.25 17:28:47.819 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.006 s]
+2025.06.25 17:28:47.965 | laboneq.compiler.workflow.realtime_compiler   | INFO   Code generation completed for all AWGs. [0.147 s]
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.neartime_execution  | INFO   Completed compilation step 1 of 1. [0.153 s]
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mDevice           [0m[1m [0m [1m [0m[1mAWG[0m[1m [0m [1m [0m[1mSeqC LOC[0m[1m [0m [1m [0m[1mCT entries[0m[1m [0m [1m [0m[1mWaveforms[0m[1m [0m [1m [0m[1mSamples[0m[1m [0m 
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460        0         21            0           1      8000  
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460_sg     0         42            2           1        64  
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mTOTAL            [0m[1m [0m [1m [0m[1m   [0m[1m [0m [1m [0m[1m      63[0m[1m [0m [1m [0m[1m         2[0m[1m [0m [1m [0m[1m         [0m[1m [0m [1m [0m[1m   8064[0m[1m [0m 
+2025.06.25 17:28:47.968 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:28:47.983 | laboneq.compiler.workflow.compiler            | INFO   Finished LabOne Q Compiler run.
+2025.06.25 17:32:37.674 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:32:37.677 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:32:37.679 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:32:37.680 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:32:37.682 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:32:37.683 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:32:37.684 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:33:03.005 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:33:03.008 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:33:03.009 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:33:03.012 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:33:03.013 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:33:03.013 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:33:03.014 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:33:30.717 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:33:30.719 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:33:30.720 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:33:30.722 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:33:30.723 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:33:30.724 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:33:30.724 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:33:30.734 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:33:30.811 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.076 s]
+2025.06.25 17:33:43.656 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:33:43.660 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:33:43.662 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:33:43.664 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:33:43.665 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:33:43.665 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:33:43.666 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:33:43.672 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:33:43.680 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.006 s]
+2025.06.25 17:33:43.716 | laboneq.compiler.workflow.realtime_compiler   | INFO   Code generation completed for all AWGs. [0.032 s]
+2025.06.25 17:33:43.717 | laboneq.compiler.workflow.neartime_execution  | INFO   Completed compilation step 1 of 1. [0.039 s]
+2025.06.25 17:33:43.719 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:33:43.720 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mDevice           [0m[1m [0m [1m [0m[1mAWG[0m[1m [0m [1m [0m[1mSeqC LOC[0m[1m [0m [1m [0m[1mCT entries[0m[1m [0m [1m [0m[1mWaveforms[0m[1m [0m [1m [0m[1mSamples[0m[1m [0m 
+2025.06.25 17:33:43.720 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:33:43.720 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460        0        605            0           1      8000  
+2025.06.25 17:33:43.721 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460_sg     0        714           19          18      3584  
+2025.06.25 17:33:43.721 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:33:43.721 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mTOTAL            [0m[1m [0m [1m [0m[1m   [0m[1m [0m [1m [0m[1m    1319[0m[1m [0m [1m [0m[1m        19[0m[1m [0m [1m [0m[1m         [0m[1m [0m [1m [0m[1m  11584[0m[1m [0m 
+2025.06.25 17:33:43.722 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:33:43.725 | laboneq.compiler.workflow.compiler            | INFO   Finished LabOne Q Compiler run.
+2025.06.25 17:35:17.195 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:35:17.199 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:35:17.199 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:35:17.201 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:35:17.203 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:35:17.204 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:35:17.204 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:35:17.212 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:35:17.219 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.005 s]
+2025.06.25 17:35:17.248 | laboneq.compiler.workflow.realtime_compiler   | INFO   Code generation completed for all AWGs. [0.028 s]
+2025.06.25 17:35:17.249 | laboneq.compiler.workflow.neartime_execution  | INFO   Completed compilation step 1 of 1. [0.034 s]
+2025.06.25 17:35:17.251 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:17.251 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mDevice           [0m[1m [0m [1m [0m[1mAWG[0m[1m [0m [1m [0m[1mSeqC LOC[0m[1m [0m [1m [0m[1mCT entries[0m[1m [0m [1m [0m[1mWaveforms[0m[1m [0m [1m [0m[1mSamples[0m[1m [0m 
+2025.06.25 17:35:17.252 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:17.252 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460        0        605            0           1      8000  
+2025.06.25 17:35:17.253 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460_sg     0        714           19          18      3584  
+2025.06.25 17:35:17.253 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:17.253 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mTOTAL            [0m[1m [0m [1m [0m[1m   [0m[1m [0m [1m [0m[1m    1319[0m[1m [0m [1m [0m[1m        19[0m[1m [0m [1m [0m[1m         [0m[1m [0m [1m [0m[1m  11584[0m[1m [0m 
+2025.06.25 17:35:17.253 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:17.256 | laboneq.compiler.workflow.compiler            | INFO   Finished LabOne Q Compiler run.
+2025.06.25 17:35:50.965 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:35:50.967 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:35:50.967 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:35:50.970 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:35:50.971 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:35:50.971 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:35:50.971 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:35:50.981 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:35:50.990 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.007 s]
+2025.06.25 17:35:51.028 | laboneq.compiler.workflow.realtime_compiler   | INFO   Code generation completed for all AWGs. [0.037 s]
+2025.06.25 17:35:51.029 | laboneq.compiler.workflow.neartime_execution  | INFO   Completed compilation step 1 of 1. [0.045 s]
+2025.06.25 17:35:51.031 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:51.031 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mDevice           [0m[1m [0m [1m [0m[1mAWG[0m[1m [0m [1m [0m[1mSeqC LOC[0m[1m [0m [1m [0m[1mCT entries[0m[1m [0m [1m [0m[1mWaveforms[0m[1m [0m [1m [0m[1mSamples[0m[1m [0m 
+2025.06.25 17:35:51.032 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:51.032 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460        0        605            0           1      8000  
+2025.06.25 17:35:51.033 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460_sg     0        714           19          18      3584  
+2025.06.25 17:35:51.034 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:51.034 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mTOTAL            [0m[1m [0m [1m [0m[1m   [0m[1m [0m [1m [0m[1m    1319[0m[1m [0m [1m [0m[1m        19[0m[1m [0m [1m [0m[1m         [0m[1m [0m [1m [0m[1m  11584[0m[1m [0m 
+2025.06.25 17:35:51.035 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:35:51.039 | laboneq.compiler.workflow.compiler            | INFO   Finished LabOne Q Compiler run.
+2025.06.25 17:36:23.472 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:36:23.476 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:36:23.476 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:36:23.477 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:36:23.479 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:36:23.479 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:36:23.480 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:36:33.882 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:36:33.884 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:36:33.885 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:36:33.886 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:36:33.888 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:36:33.888 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:36:33.888 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:36:33.897 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:36:33.897 | laboneq.compiler.scheduler.scheduler          | INFO   Phase reset in section 'spect_sweep' has extended the section's timing grid to 40.00 ns, so to be commensurate with the local oscillator.
+2025.06.25 17:36:33.897 | laboneq.compiler.scheduler.scheduler          | INFO   Phase reset in section 'spect_sweep' has extended the section's timing grid to 40.00 ns, so to be commensurate with the local oscillator.
+2025.06.25 17:36:33.909 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.008 s]
+2025.06.25 17:36:33.933 | laboneq.compiler.workflow.realtime_compiler   | INFO   Code generation completed for all AWGs. [0.023 s]
+2025.06.25 17:36:33.934 | laboneq.compiler.workflow.neartime_execution  | INFO   Completed compilation step 1 of 1. [0.032 s]
+2025.06.25 17:36:33.936 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:33.936 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mDevice           [0m[1m [0m [1m [0m[1mAWG[0m[1m [0m [1m [0m[1mSeqC LOC[0m[1m [0m [1m [0m[1mCT entries[0m[1m [0m [1m [0m[1mWaveforms[0m[1m [0m [1m [0m[1mSamples[0m[1m [0m 
+2025.06.25 17:36:33.937 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:33.937 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460        0         20            0           1      8000  
+2025.06.25 17:36:33.938 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460_sg     0         46            3           2       576  
+2025.06.25 17:36:33.938 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:33.938 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mTOTAL            [0m[1m [0m [1m [0m[1m   [0m[1m [0m [1m [0m[1m      66[0m[1m [0m [1m [0m[1m         3[0m[1m [0m [1m [0m[1m         [0m[1m [0m [1m [0m[1m   8576[0m[1m [0m 
+2025.06.25 17:36:33.939 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:33.941 | laboneq.compiler.workflow.compiler            | INFO   Finished LabOne Q Compiler run.
+2025.06.25 17:36:56.376 | laboneq.laboneq_logging                       | INFO   Logging initialized from [Default inline config in laboneq.laboneq_logging] logdir is c:\_Lib\python\clab\experiments\zurich_exp\laboneq_output\log
+2025.06.25 17:36:56.376 | laboneq.controller.controller                 | INFO   VERSION: laboneq 2.51.0
+2025.06.25 17:36:56.376 | laboneq.controller.devices.device_collection  | INFO   Connecting to data server at 127.0.0.1:8004
+2025.06.25 17:36:56.376 | laboneq.controller.devices.async_support      | INFO   Connected to Zurich Instruments LabOne Data Server version 25.04.0.628 at 127.0.0.1:8004
+2025.06.25 17:36:56.376 | laboneq.controller.devices.device_zi          | WARNING SHFQC/QA:dev12460: Include the device options 'SHFQC/QC6CH' in the device setup ('options' field of the 'instruments' list in the device setup descriptor, 'device_options' argument when constructing instrument objects to be added to 'DeviceSetup' instances). This will become a strict requirement in the future.
+2025.06.25 17:36:56.385 | laboneq.controller.devices.device_collection  | INFO   Configuring the device setup
+2025.06.25 17:36:56.387 | laboneq.controller.devices.device_collection  | INFO   The device setup is configured
+2025.06.25 17:36:56.399 | laboneq.compiler.workflow.compiler            | INFO   Starting LabOne Q Compiler run...
+2025.06.25 17:36:56.403 | laboneq.compiler.scheduler.scheduler          | INFO   Phase reset in section 'spect_sweep' has extended the section's timing grid to 40.00 ns, so to be commensurate with the local oscillator.
+2025.06.25 17:36:56.403 | laboneq.compiler.scheduler.scheduler          | INFO   Phase reset in section 'spect_sweep' has extended the section's timing grid to 40.00 ns, so to be commensurate with the local oscillator.
+2025.06.25 17:36:56.413 | laboneq.compiler.workflow.realtime_compiler   | INFO   Schedule completed. [0.010 s]
+2025.06.25 17:36:56.438 | laboneq.compiler.workflow.realtime_compiler   | INFO   Code generation completed for all AWGs. [0.024 s]
+2025.06.25 17:36:56.439 | laboneq.compiler.workflow.neartime_execution  | INFO   Completed compilation step 1 of 1. [0.034 s]
+2025.06.25 17:36:56.440 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:56.442 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mDevice           [0m[1m [0m [1m [0m[1mAWG[0m[1m [0m [1m [0m[1mSeqC LOC[0m[1m [0m [1m [0m[1mCT entries[0m[1m [0m [1m [0m[1mWaveforms[0m[1m [0m [1m [0m[1mSamples[0m[1m [0m 
+2025.06.25 17:36:56.442 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:56.442 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460        0         20            0           1      8000  
+2025.06.25 17:36:56.443 | laboneq.compiler.workflow.reporter            | INFO     SHFQC_dev12460_sg     0         46            3           2       576  
+2025.06.25 17:36:56.443 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:56.444 | laboneq.compiler.workflow.reporter            | INFO    [1m [0m[1mTOTAL            [0m[1m [0m [1m [0m[1m   [0m[1m [0m [1m [0m[1m      66[0m[1m [0m [1m [0m[1m         3[0m[1m [0m [1m [0m[1m         [0m[1m [0m [1m [0m[1m   8576[0m[1m [0m 
+2025.06.25 17:36:56.444 | laboneq.compiler.workflow.reporter            | INFO    ─────────────────────────────────────────────────────────────────────── 
+2025.06.25 17:36:56.447 | laboneq.compiler.workflow.compiler            | INFO   Finished LabOne Q Compiler run.

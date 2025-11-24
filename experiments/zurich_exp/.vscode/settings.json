@@ -1,0 +1,15 @@
+{
+    "python.analysis.extraPaths": [
+        "./utilities",
+        "C:/_Lib/python",
+        "C:/_Lib/python/clab/experiments",
+        "C:/_Lib/python/clab/experiments/zurich_exp",
+        "C:/_Lib/python/clab/experiments/pnax_exp",
+        "C:/_Lib/python/clab/experiments/qick_exp",
+        "C:/_Lib/python/clab/experiments/qick_exp/exp_code",
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python-envs.pythonProjects": [],
+        
+}

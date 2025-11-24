@@ -1,0 +1,3 @@
+[submodule "slab"]
+	path = slab
+	url = https://github.com/chakramlab/slab

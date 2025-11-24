@@ -1,0 +1,484 @@
+{
+    "_default": {
+        "1": {
+            "correction": [
+                1.049259290099144,
+                0.17271078005433083,
+                0.17496002092957497,
+                1.0357702821493149
+            ],
+            "i_offset": -0.00775146484375,
+            "q_offset": 0.00994873046875,
+            "lo_frequency": 5000000000.0,
+            "if_frequency": 5000000.0,
+            "temperature": 55.125,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "2": {
+            "correction": [
+                1.0033287145197392,
+                -0.08357913047075272,
+                -0.08244425803422928,
+                1.0171398669481277
+            ],
+            "i_offset": -0.0029296875,
+            "q_offset": -0.0006103515625,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 100000000.0,
+            "temperature": 56.875,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "3": {
+            "correction": [
+                1.0605106502771378,
+                -0.14448964595794678,
+                -0.15260732173919678,
+                1.0040986649692059
+            ],
+            "i_offset": -0.00555419921875,
+            "q_offset": -0.0052337646484375,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 370000000.0,
+            "temperature": 55.4375,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "4": {
+            "correction": [
+                1.0404390506446362,
+                -0.17416829615831375,
+                -0.1734892800450325,
+                1.0445112027227879
+            ],
+            "i_offset": -0.009063720703125,
+            "q_offset": -0.0084228515625,
+            "lo_frequency": 6300000000.0,
+            "if_frequency": 270000000.0,
+            "temperature": 55.25,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "5": {
+            "correction": [
+                1.0253473930060863,
+                -0.13385442271828651,
+                -0.13372376933693886,
+                1.0263491980731487
+            ],
+            "i_offset": -0.01068115234375,
+            "q_offset": -0.00653076171875,
+            "lo_frequency": 6370000000.0,
+            "if_frequency": 200000000.0,
+            "temperature": 55.3125,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "6": {
+            "correction": [
+                1.0047775581479073,
+                -0.08546167239546776,
+                -0.08446603640913963,
+                1.01662128418684
+            ],
+            "i_offset": -0.0029296875,
+            "q_offset": -0.0006103515625,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 120000000.0,
+            "temperature": 56.875,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "7": {
+            "correction": [
+                1.0047775581479073,
+                -0.08546167239546776,
+                -0.08446603640913963,
+                1.01662128418684
+            ],
+            "i_offset": -0.0029296875,
+            "q_offset": -0.0006103515625,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 140000000.0,
+            "temperature": 56.875,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "8": {
+            "correction": [
+                1.0040441751480103,
+                -0.08652897924184799,
+                -0.08535405248403549,
+                1.017865177243948
+            ],
+            "i_offset": -0.0029296875,
+            "q_offset": -0.00054931640625,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 160000000.0,
+            "temperature": 56.875,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "9": {
+            "correction": [
+                1.0047828666865826,
+                -0.08947883173823357,
+                -0.088263850659132,
+                1.0186140350997448
+            ],
+            "i_offset": -0.0029296875,
+            "q_offset": -0.0006103515625,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 180000000.0,
+            "temperature": 56.8125,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "10": {
+            "correction": [
+                0.9970604591071606,
+                -0.06954370439052582,
+                -0.06816540658473969,
+                1.017220925539732
+            ],
+            "i_offset": -0.00537109375,
+            "q_offset": -0.005126953125,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 25000000.0,
+            "temperature": 55.3125,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "12": {
+            "correction": [
+                1.0033421479165554,
+                -0.09162555634975433,
+                -0.09002910554409027,
+                1.0211340188980103
+            ],
+            "i_offset": -0.0054931640625,
+            "q_offset": -0.00518798828125,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 100000000.0,
+            "temperature": 55.375,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "13": {
+            "correction": [
+                1.0061607509851456,
+                -0.09842514991760254,
+                -0.09689927101135254,
+                1.0220048278570175
+            ],
+            "i_offset": -0.0054931640625,
+            "q_offset": -0.00518798828125,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 120000000.0,
+            "temperature": 55.375,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "14": {
+            "correction": [
+                1.0097978338599205,
+                -0.10412571579217911,
+                -0.10291264206171036,
+                1.0217007361352444
+            ],
+            "i_offset": -0.0054931640625,
+            "q_offset": -0.00518798828125,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 140000000.0,
+            "temperature": 55.375,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "15": {
+            "correction": [
+                1.0132359825074673,
+                -0.10882352292537689,
+                -0.10797666013240814,
+                1.0211828090250492
+            ],
+            "i_offset": -0.005523681640625,
+            "q_offset": -0.00518798828125,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 160000000.0,
+            "temperature": 55.375,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "16": {
+            "correction": [
+                1.0137843489646912,
+                -0.11383708193898201,
+                -0.11273081973195076,
+                1.023732926696539
+            ],
+            "i_offset": -0.00555419921875,
+            "q_offset": -0.00518798828125,
+            "lo_frequency": 6200000000.0,
+            "if_frequency": 180000000.0,
+            "temperature": 55.375,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "17": {
+            "correction": [
+                1.0154465064406395,
+                -0.11263466998934746,
+                -0.11197663471102715,
+                1.0214138180017471
+            ],
+            "i_offset": -0.00885009765625,
+            "q_offset": -0.00836181640625,
+            "lo_frequency": 6300000000.0,
+            "if_frequency": 100000000.0,
+            "temperature": 55.25,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "18": {
+            "correction": [
+                1.01867251470685,
+                -0.11937377601861954,
+                -0.11890838295221329,
+                1.0226594768464565
+            ],
+            "i_offset": -0.00885009765625,
+            "q_offset": -0.0084228515625,
+            "lo_frequency": 6300000000.0,
+            "if_frequency": 120000000.0,
+            "temperature": 55.25,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "19": {
+            "correction": [
+                1.0216768272221088,
+                -0.12512218952178955,
+                -0.12487804889678955,
+                1.023674238473177
+            ],
+            "i_offset": -0.0089111328125,
+            "q_offset": -0.0084228515625,
+            "lo_frequency": 6300000000.0,
+            "if_frequency": 140000000.0,
+            "temperature": 55.3125,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "20": {
+            "correction": [
+                1.0240623615682125,
+                -0.12890625,
+                -0.12890625,
+                1.0240623615682125
+            ],
+            "i_offset": -0.008880615234375,
+            "q_offset": -0.008392333984375,
+            "lo_frequency": 6300000000.0,
+            "if_frequency": 160000000.0,
+            "temperature": 55.3125,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "21": {
+            "correction": [
+                1.0238483548164368,
+                -0.1340508796274662,
+                -0.13352826610207558,
+                1.0278555750846863
+            ],
+            "i_offset": -0.0089111328125,
+            "q_offset": -0.00836181640625,
+            "lo_frequency": 6300000000.0,
+            "if_frequency": 180000000.0,
+            "temperature": 55.3125,
+            "mixer_id": "octave_octave1_1",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "22": {
+            "correction": [
+                1.0079669281840324,
+                -0.09019607305526733,
+                -0.08949416875839233,
+                1.0158724300563335
+            ],
+            "i_offset": -0.00299072265625,
+            "q_offset": -0.000732421875,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 200000000.0,
+            "temperature": 56.875,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "23": {
+            "correction": [
+                1.0001049414277077,
+                -0.06882987171411514,
+                -0.06789527088403702,
+                1.013871718198061
+            ],
+            "i_offset": -0.003173828125,
+            "q_offset": -0.0018310546875,
+            "lo_frequency": 7100000000.0,
+            "if_frequency": 100000000.0,
+            "temperature": 56.9375,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "24": {
+            "correction": [
+                1.0018453262746334,
+                -0.07712632790207863,
+                -0.07607907429337502,
+                1.0156360566616058
+            ],
+            "i_offset": -0.0029296875,
+            "q_offset": -0.0008544921875,
+            "lo_frequency": 7000000000.0,
+            "if_frequency": 10000000.0,
+            "temperature": 56.9375,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        },
+        "25": {
+            "correction": [
+                1.0081141851842403,
+                -0.09823180735111237,
+                -0.09708739817142487,
+                1.0199972428381443
+            ],
+            "i_offset": -0.0032958984375,
+            "q_offset": 0.0009765625,
+            "lo_frequency": 6900000000.0,
+            "if_frequency": 300000000.0,
+            "temperature": 56.875,
+            "mixer_id": "octave_octave1_2",
+            "optimizer_parameters": {
+                "average_iterations": 100,
+                "iterations": 10000,
+                "calibration_offset_frequency": 7000000.0,
+                "keep_on": false
+            }
+        }
+    }
+}

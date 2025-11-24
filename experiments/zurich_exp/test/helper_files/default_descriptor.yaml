@@ -1,0 +1,134 @@
+instruments:
+  SHFQC:
+  - address: dev12460
+    uid: SHFQC_dev12460
+connections:
+  SHFQC_dev12460:
+  - iq_signal: q0/dev12460_drive_0_0_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_1_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_2_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_3_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_4_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_5_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_6_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_0_7_line
+    ports: SGCHANNELS/0/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_0_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_1_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_2_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_3_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_4_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_5_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_6_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_1_7_line
+    ports: SGCHANNELS/1/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_0_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_1_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_2_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_3_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_4_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_5_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_6_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_2_7_line
+    ports: SGCHANNELS/2/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_0_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_1_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_2_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_3_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_4_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_5_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_6_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_3_7_line
+    ports: SGCHANNELS/3/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_0_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_1_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_2_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_3_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_4_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_5_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_6_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_4_7_line
+    ports: SGCHANNELS/4/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_0_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_1_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_2_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_3_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_4_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_5_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_6_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_drive_5_7_line
+    ports: SGCHANNELS/5/OUTPUT
+  - iq_signal: q0/dev12460_measure_0_0_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_0_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_1_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_1_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_2_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_2_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_3_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_3_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_4_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_4_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_5_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_5_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_6_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_6_line
+    ports: QACHANNELS/0/INPUT
+  - iq_signal: q0/dev12460_measure_0_7_line
+    ports: QACHANNELS/0/OUTPUT
+  - acquire_signal: q0/dev12460_acquire_0_7_line
+    ports: QACHANNELS/0/INPUT

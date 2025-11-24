@@ -1,0 +1,36 @@
+[tool.black]
+line-length = 88
+target-version = ['py37']
+include = '\.pyi?$'
+required-version = "22.8.0"
+extend-exclude = '''
+/(
+  | .mypy-cache
+  | .tox
+  | venv*
+  | docs
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+src_paths = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "scripts/tests"]
+addopts = "-l"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "setuptools_scm[toml]"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+"write_to" = "src/zhinst/toolkit/_version.py"
+"local_scheme" = "no-local-version"
