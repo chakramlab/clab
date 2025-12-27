@@ -54,7 +54,11 @@ class QubitSpectroscopyProgram(RAveragerProgram):
         
 
         # ------------------------------- Qubit Param
-        self.q_ch=cfg.device.soc.qubit.ch
+        if self.cfg.expt.resolved_channel:
+            self.q_ch = cfg.device.soc.qubit.pulses.pi_ge_resolved.ch
+            print("Using resolved channel:", self.q_ch)
+        else:
+            self.q_ch=cfg.device.soc.qubit.ch
         self.q_length = self.us2cycles(cfg.expt.length)
         self.q_freq_start = self.freq2reg(cfg.expt.start, gen_ch = self.q_ch)
         self.q_freq_step = self.freq2reg(cfg.expt.step)
@@ -78,8 +82,12 @@ class QubitSpectroscopyProgram(RAveragerProgram):
         cfg=AttrDict(self.cfg)
         # soc = self.cfg.soc
         # soc = self.im[self.cfg.aliases.soc]
+
         self.pulse(ch=self.q_ch)
         self.sync_all()
+
+
+
         # Readout kick pulse
 
         if self.cfg.device.soc.readout.kick_pulse:

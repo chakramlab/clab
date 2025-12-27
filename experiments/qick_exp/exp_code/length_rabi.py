@@ -25,6 +25,7 @@ class LengthRabiProgram(AveragerProgram):
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist)
         self.declare_gen(ch=self.qubit_ch, nqz=self.cfg.device.soc.qubit.nyqist)
+        self.declare_gen(ch=self.qubit_resolved_ch, nqz=self.cfg.device.soc.qubit.nyqist)
 
 
         for ch in [0]:  # configure the readout lengths and downconversion frequencies
@@ -102,7 +103,7 @@ class LengthRabiProgram(AveragerProgram):
         else:
             channel = self.qubit_ch
 
-        print('Qubit channel:', channel)
+        # print('Qubit channel:', channel)
         if self.cfg.length_placeholder != 0:
             if self.cfg.expt.pulse_type == "gauss":
                 self.add_gauss(ch=channel, name="qubit", sigma=self.sigma_test, length=self.sigma_test*4)
@@ -156,13 +157,13 @@ class LengthRabiProgram(AveragerProgram):
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
         
-        print('Readout relax delay (us)', self.cfg.device.soc.readout.relax_delay)
+        # print('Readout relax delay (us)', self.cfg.device.soc.readout.relax_delay)
 
         # Transmon Reset
 
         if cfg.expt.reset:
             
-            print('Initiating transmon reset')
+            # print('Initiating transmon reset')
             
             for ii in range(cfg.device.soc.readout.reset_cycles):
                 # print('Resetting System,', 'Cycle', ii)

@@ -240,24 +240,15 @@ class AmplitudeRabiExperiment(Experiment):
         
         gains = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-        data = {"xpts": [], "avgi": [], "avgq": [], "amps": [], "phases": []}
+        data = {"xpts": [], "avgi": [], "avgq": []}
         for gain in tqdm(gains, disable=not progress):
             self.cfg.expt.gain_placeholder = int(gain)
             rspec = AmplitudeRabiProgram(soc, self.cfg)
             self.prog = rspec
             avgi, avgq = rspec.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)
-            amp = np.abs(avgi[0][0] + 1j * avgq[0][0])  # Calculating the magnitude
-            phase = np.angle(avgi[0][0] + 1j * avgq[0][0])  # Calculating the phase
             data["xpts"].append(gains)
             data["avgi"].append(avgi)
             data["avgq"].append(avgq)
-            data["amps"].append(amp)
-            data["phases"].append(phase)
-
-        for k, a in data.items():
-            data[k] = np.array(a)
-
-        self.data = data
 
         avgi_col = np.array([data["avgi"][i][0][0] for i in range(len(data['avgi']))])
         avgq_col = np.array([data["avgq"][i][0][0] for i in range(len(data['avgq']))])
@@ -277,7 +268,7 @@ class AmplitudeRabiExperiment(Experiment):
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
 
-        return data
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:

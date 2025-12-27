@@ -200,7 +200,7 @@ class HistogramProgram(RAveragerProgram):
                 style="const",
                 freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
                 phase=self.deg2reg(0),
-                gain=self.cfg.expt.kick_pulse_gain,
+                gain=self.cfg.device.soc.readout.kick_pulse_gain,
                 length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
             
             self.pulse(ch=self.cfg.device.soc.resonator.ch)
@@ -213,7 +213,7 @@ class HistogramProgram(RAveragerProgram):
             style="const",
             freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
             phase=self.deg2reg(0),
-            gain=self.cfg.expt.gain,
+            gain=self.cfg.device.soc.resonator.gain,
             length=self.us2cycles(self.cfg.expt.readout_length, gen_ch=self.cfg.device.soc.resonator.ch))
         
         self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
@@ -225,7 +225,7 @@ class HistogramProgram(RAveragerProgram):
         print('Readout relax delay (us):', self.cfg.device.soc.readout.relax_delay)
         print('Readout length (us):', self.cfg.expt.readout_length)
         print('ADC trigger offset (us):', self.cfg.expt.adc_trig_offset)
-        print('Readout gain (DAC units):', self.cfg.expt.gain)
+        print('Readout gain (DAC units):', self.cfg.device.soc.resonator.gain)
 
         # Transmon Reset
 
@@ -243,30 +243,28 @@ class HistogramProgram(RAveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
 
-                if self.cfg.expt.state_temp == 'h':
+                # pi_fh
 
-                    # pi_fh
+                self.play_pifh_pulse()
+                self.sync_all()
 
-                    self.play_pifh_pulse()
-                    self.sync_all()
+                # f0g1 to readout mode
 
-                    # f0g1 to readout mode
-
-                    sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
-                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
-                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
-                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
-                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
-                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
-                    
-                    self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
-                    self.sync_all()
+                sb_freq = self.cfg.device.soc.sideband.fngnp1_readout_freqs[0]
+                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_reset_lengths[0]
+                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1_readout_gains[0]
+                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
+                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                
+                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+                self.sync_all()
                 
                 # pi_ef
 
@@ -329,7 +327,11 @@ class HistogramExperiment(Experiment):
         i_h = []
         q_h = []
         data_dict = {}
-        for state in self.cfg.expt.states:
+        if self.cfg.expt.f_h_state:
+            states = ['g', 'e', 'f', 'h']
+        else:
+            states = ['g', 'e']
+        for state in states:
             self.cfg.expt.state_temp = state
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
             histpro = HistogramProgram(soc, self.cfg)

@@ -139,8 +139,8 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
             if pulse_type == 'flat_top':
 
                 if ramp_type == 'bump':
-                    print('Sideband flat top bump with freq. modulation')
-                    print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
+                    # print('Sideband flat top bump with freq. modulation')
+                    # print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
                     self.set_pulse_registers(
                         ch=self.sideband_ch,
                         style="arb",
@@ -152,7 +152,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         else: 
             if pulse_type == 'const':
                 
-                print('Sideband const')
+                # print('Sideband const')
                 self.set_pulse_registers(
                         ch=self.sideband_ch, 
                         style="const", 
@@ -164,7 +164,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
             if pulse_type == 'flat_top':
                 
                 if ramp_type == 'sin_squared':
-                    print('Sideband flat top sin squared')
+                    # print('Sideband flat top sin squared')
                     self.set_pulse_registers(
                         ch=self.sideband_ch,
                         style="flat_top",
@@ -175,7 +175,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
                         waveform="sb_flat_top_sin_squared")
 
                 elif ramp_type == 'gaussian':
-                    print('Sideband flat top gaussian')
+                    # print('Sideband flat top gaussian')
                     self.set_pulse_registers(
                         ch=self.sideband_ch,
                         style="flat_top",
@@ -186,7 +186,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
                         waveform="sb_flat_top_gaussian")
                 
                 elif ramp_type == 'bump':
-                    print('Sideband flat top bump')
+                    # print('Sideband flat top bump')
                     self.set_pulse_registers(
                         ch=self.sideband_ch,
                         style="flat_top",
@@ -204,7 +204,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         # Phase reset all channels
         for ch in self.gen_chs.keys():
             if ch != 4:
-                print(ch)
+                # print(ch)
                 self.setup_and_pulse(ch=ch, style='const', freq=self.freq2reg(100), phase=0, gain=100, length=self.us2cycles(.05), phrst=1)
 
         self.sync_all(10)
@@ -238,7 +238,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
             sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
             sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
             sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-            print('Loading photon: playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+            # print('Loading photon: playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
             self.sync_all()
 
@@ -256,9 +256,9 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n]
         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-        print('ramsey: Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        # print('ramsey: Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
 
-        if self.cfg.device.soc.sideband.drive_frame_stark_shift_correction:
+        if self.cfg.expt.chirp:
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, stark_shift_idle_correction=True, phase=self.cfg.expt.phase_offset)
         else:
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, phase=self.cfg.expt.phase_offset)
@@ -273,9 +273,9 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n]
         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-        print('ramsey: Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        # print('ramsey: Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
 
-        if self.cfg.device.soc.sideband.drive_frame_stark_shift_correction:
+        if self.cfg.expt.chirp:
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, stark_shift_idle_correction=True, phase=-self.cfg.expt.phase_offset)
         else:
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma, phase=-self.cfg.expt.phase_offset)
@@ -305,7 +305,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
         # Readout kick pulse
 
         if self.cfg.device.soc.readout.kick_pulse:
-            print('Playing kick pulse')
+            # print('Playing kick pulse')
             self.set_pulse_registers(
                 ch=self.cfg.device.soc.resonator.ch,
                 style="const",
@@ -337,7 +337,7 @@ class f0g1SidebandRamseyV2Program(AveragerProgram):
 
         if cfg.expt.reset:
             
-            print('Resetting system')
+            # print('Resetting system')
             self.cfg.device.soc.readout.reset_cavity_n = self.cfg.expt.n + 1
 
             for ii in range(cfg.device.soc.readout.reset_cycles):

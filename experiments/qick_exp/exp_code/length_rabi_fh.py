@@ -359,18 +359,12 @@ class LengthRabiFHExperiment(Experiment):
             rspec = LengthRabiFHProgram(soc, self.cfg)
             self.prog = rspec
             avgi, avgq = rspec.acquire(self.im[self.cfg.aliases.soc], load_pulses=True, progress=False)
-            amp = np.abs(avgi[0][0] + 1j * avgq[0][0])  # Calculating the magnitude
-            phase = np.angle(avgi[0][0] + 1j * avgq[0][0])  # Calculating the phase
             data["xpts"].append(lengths)
             data["avgi"].append(avgi)
             data["avgq"].append(avgq)
-            data["amps"].append(amp)
-            data["phases"].append(phase)
 
-        for k, a in data.items():
-            data[k] = np.array(a)
-
-        self.data = data
+        # for k, a in data.items():
+        #     data[k] = np.array(a)
 
         avgi_col = np.array([data["avgi"][i][0][0] for i in range(len(data['avgi']))])
         avgq_col = np.array([data["avgq"][i][0][0] for i in range(len(data['avgq']))])
@@ -381,16 +375,16 @@ class LengthRabiFHExperiment(Experiment):
 
             iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
             i_prob, q_prob = self.get_qubit_prob(avgi_col, avgq_col, iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
-            data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col, 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+            data_dict = {'xpts': lengths, 'avgq':avgq_col, 'avgi':avgi_col, 'i_g': [iq_calib['i_g']], 'q_g': [iq_calib['q_g']], 'i_e': [iq_calib['i_e']], 'q_e': [iq_calib['q_e']], 'avgi_prob': i_prob, 'avgq_prob': q_prob}
         
         else:
 
-            data_dict = {'xpts': data['xpts'][0], 'avgq':avgq_col, 'avgi':avgi_col}
+            data_dict = {'xpts': lengths, 'avgq':avgq_col, 'avgi':avgi_col}
 
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
 
-        return data
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:

@@ -7,7 +7,7 @@ from slab import Experiment, dsfit, AttrDict
 from tqdm import tqdm_notebook as tqdm
 
 
-class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
+class fngnp1SidebandRamseyTwoPiPhaseSweepDetuningProgram(AveragerProgram):
     def initialize(self):
         cfg = AttrDict(self.cfg)
         self.cfg.update(cfg.expt)
@@ -21,7 +21,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
         except:
             self.sideband_ch = self.qubit_ch
 
-        print('WORKING')
+        
         self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
@@ -92,15 +92,34 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
             
             # add 2pi pulses
 
-            self.add_bump_func_freq_modulation(
+            # For detuning on sb pulse
+
+            if ii==self.cfg.expt.n:
+
+                tau_sb_n = self.cfg.device.soc.sideband.pulses.fngnp1twopi_times[self.cfg.expt.mode][self.cfg.expt.n] + self.cfg.expt.ramp_effective_time  # Effective 2pi pulse time for f,n-g,n+1
+                g_sb_n = 1 / 2 / tau_sb_n
+                pulse_time = 1 / 2 / np.sqrt((self.cfg.expt.sb_detuning / 2)**2 + g_sb_n**2) - self.cfg.expt.ramp_effective_time
+                print('Detuning (MHz):', self.cfg.expt.sb_detuning)
+                print('Adjusted 2pi pulse time (us):', pulse_time)
+                print('Effective ramp pulse time (us):', self.cfg.expt.ramp_effective_time)
+        
+                self.add_bump_func_freq_modulation(
                 ch=self.sideband_ch, name=f'sb_flat_top_bump_freq_mod_f{ii}g{ii+1}', 
                 ramp_length=self.us2cycles(self.cfg.expt.ramp_sigma), 
-                flat_top_length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1twopi_times[self.cfg.expt.mode][ii]), 
+                flat_top_length=self.us2cycles(pulse_time), 
                 k=2, 
-                freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][ii] + self.sb_n_detunings[ii])
+                freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][ii] + self.sb_n_detunings[ii] + self.cfg.expt.sb_detuning)
+
+            else:
+                self.add_bump_func_freq_modulation(
+                    ch=self.sideband_ch, name=f'sb_flat_top_bump_freq_mod_f{ii}g{ii+1}', 
+                    ramp_length=self.us2cycles(self.cfg.expt.ramp_sigma), 
+                    flat_top_length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1twopi_times[self.cfg.expt.mode][ii]), 
+                    k=2, 
+                    freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][ii] + self.sb_n_detunings[ii])
 
             # add pi pulses
-
+            
             self.add_bump_func_freq_modulation(
                 ch=self.sideband_ch, name=f'sb_flat_top_bump_freq_mod_pi_f{ii}g{ii+1}', 
                 ramp_length=self.us2cycles(self.cfg.expt.ramp_sigma), 
@@ -167,9 +186,9 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
                 if ramp_type == 'bump':
 
                     if pi==False:
-                        print('n', n)
-                        print('Sideband 2pi flat top bump with freq. modulation')
-                        print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][0] + self.sb_n_detunings[n])
+                        # print('n', n)
+                        # print('Sideband 2pi flat top bump with freq. modulation')
+                        # print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][0] + self.sb_n_detunings[n])
                         self.set_pulse_registers(
                             ch=self.sideband_ch,
                             style="arb",
@@ -178,9 +197,9 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
                             gain=gain,
                             waveform=f"sb_flat_top_bump_freq_mod_f{n}g{n+1}")
                     else: 
-                        print('n', n)
-                        print('Sideband pi flat top bump with freq. modulation')
-                        print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][0] + self.sb_n_detunings[n])
+                        # print('n', n)
+                        # print('Sideband pi flat top bump with freq. modulation')
+                        # print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][0] + self.sb_n_detunings[n])
                         self.set_pulse_registers(
                             ch=self.sideband_ch,
                             style="arb",
@@ -192,7 +211,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
         else: 
             if pulse_type == 'const':
                 
-                print('Sideband const')
+                # print('Sideband const')
                 self.set_pulse_registers(
                         ch=self.sideband_ch, 
                         style="const", 
@@ -215,7 +234,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
                         waveform="sb_flat_top_sin_squared")
 
                 elif ramp_type == 'gaussian':
-                    print('Sideband flat top gaussian')
+                    # print('Sideband flat top gaussian')
                     self.set_pulse_registers(
                         ch=self.sideband_ch,
                         style="flat_top",
@@ -456,7 +475,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
         # Readout kick pulse
 
         if self.cfg.device.soc.readout.kick_pulse:
-            print('Playing kick pulse')
+            # print('Playing kick pulse')
             self.set_pulse_registers(
                 ch=self.cfg.device.soc.resonator.ch,
                 style="const",
@@ -489,7 +508,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
         if cfg.expt.reset:
 
             self.cfg.device.soc.readout.reset_cavity_n = self.cfg.expt.n + 1
-            print('Resetting system up to n =', self.cfg.expt.n + 1)
+            # print('Resetting system up to n =', self.cfg.expt.n + 1)
 
             for ii in range(cfg.device.soc.readout.reset_cycles):
 
@@ -590,7 +609,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepProgram(AveragerProgram):
             
             self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
-class fngnp1SidebandRamseyTwoPiPhaseSweepExperiment(Experiment):
+class fngnp1SidebandRamseyTwoPiPhaseSweepDetuningExperiment(Experiment):
     """T1 Experiment
        Experimental Config
         expt =  {"start":0, "step": 1, "expts":200, "reps": 10, "rounds": 200}
@@ -611,7 +630,7 @@ class fngnp1SidebandRamseyTwoPiPhaseSweepExperiment(Experiment):
             self.cfg.expt.phase_temp = phase
 
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            t1 = fngnp1SidebandRamseyTwoPiPhaseSweepProgram(soc, self.cfg)
+            t1 = fngnp1SidebandRamseyTwoPiPhaseSweepDetuningProgram(soc, self.cfg)
             avgi, avgq = t1.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
 
             avgi_col.append(avgi[0][0])

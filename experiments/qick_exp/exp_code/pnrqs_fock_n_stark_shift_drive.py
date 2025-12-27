@@ -10,7 +10,7 @@ from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
 
-class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
+class PhotonNumberResolvedQSpecFockNStarkShiftDriveProgram(AveragerProgram):
     def initialize(self):
 
         # --- Initialize parameters ---
@@ -282,6 +282,7 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
 
+
         if self.cfg.expt.resolved_channel:
             channel = self.qubit_resolved_ch
             print("Using resolved channel:", channel)
@@ -312,7 +313,12 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
                     gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain, 
                     length=self.sigma_ge_resolved)
             
-        self.pulse(ch=channel)
+        # Play a stark shift pulse for the same length of the resolved pi pulse
+        offset = 0.02
+        self.play_sb(freq=self.cfg.expt.drive_freq, length=cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma+2*offset, gain=cfg.expt.drive_gain, pulse_type='flat_top', ramp_type='bump', ramp_sigma=self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0])
+        print('Playing stark shift drive pulse, freq = ' + str(self.cfg.expt.drive_freq) + ', length = ' + str(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma) + ', gain = ' + str(cfg.expt.drive_gain))
+
+        self.pulse(ch=channel, t=self.us2cycles(offset))
         self.sync_all()
 
         # Readout kick pulse
@@ -452,7 +458,7 @@ class PhotonNumberResolvedQSpecFockNProgram(AveragerProgram):
             self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
 
-class PhotonNumberResolvedQSpecFockNExperiment(Experiment):
+class PhotonNumberResolvedQSpecFockNStarkShiftDriveExperiment(Experiment):
     """Qubit Spectroscopy Experiment
        Experimental Config
         expt={"start":4020, "step":0.35, "expts":300, "reps": 200,"rounds":50,
@@ -472,7 +478,7 @@ class PhotonNumberResolvedQSpecFockNExperiment(Experiment):
         for i in tqdm(fpts, disable = not progress):
             self.cfg.expt.freq_placeholder = i
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            qspec=PhotonNumberResolvedQSpecFockNProgram(soc, self.cfg)
+            qspec=PhotonNumberResolvedQSpecFockNStarkShiftDriveProgram(soc, self.cfg)
             avgi, avgq = qspec.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=False) 
 
             avgi_col.append(avgi[0][0])
