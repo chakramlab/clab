@@ -74,6 +74,14 @@ class fngnp1TwoPiBangBangProgram(AveragerProgram):
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2)
         self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2, k=2, flat_top_fraction=0.0)
 
+        self.sb_n_detuning = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n] - self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][0]
+        self.add_bump_func_freq_modulation(
+            ch=self.sideband_ch, name='sb_flat_top_bump_freq_mod', 
+            ramp_length=self.us2cycles(self.cfg.expt.sb_sigma), 
+            flat_top_length=self.us2cycles(self.cfg.device.soc.sideband.pulses.fngnp1twopi_times[self.cfg.expt.mode][self.cfg.expt.n]), 
+            k=2, 
+            freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n] + self.sb_n_detuning)  # Chirp from the undriven f0g1 frequency
+        
         print('Ramp sigma (us):', self.cfg.expt.sb_sigma)
         self.sync_all(self.us2cycles(0.2))
     
@@ -168,54 +176,70 @@ class fngnp1TwoPiBangBangProgram(AveragerProgram):
     #     print('freq', self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][n])
     #     self.pulse(ch=self.sideband_ch)
 
-    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=0.01, phase=0, shift=0, gain_shift=0):
-
-        if pulse_type == 'const':
-            
-            # print('Sideband const')
-            self.set_pulse_registers(
-                    ch=self.sideband_ch, 
-                    style="const", 
-                    freq=self.freq2reg(freq+shift), 
-                    phase=self.deg2reg(phase),
-                    gain=gain+gain_shift, 
-                    length=self.us2cycles(length))
+    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=0.01, phase=0, shift=0, gain_shift=0, stark_shift_idle_correction=False):
         
-        elif pulse_type == 'flat_top':
+        if stark_shift_idle_correction: 
             
-            if ramp_type == 'sin_squared':
-                print('Sideband flat top sin squared')
-                self.set_pulse_registers(
-                    ch=self.sideband_ch,
-                    style="flat_top",
-                    freq=self.freq2reg(freq+shift),
-                    phase=self.deg2reg(phase),
-                    gain=gain+gain_shift,
-                    length=self.us2cycles(length),
-                    waveform="sb_flat_top_sin_squared")
+            if pulse_type == 'flat_top':
 
-            elif ramp_type == 'bump':
-
-                print('Sideband flat top bump')
+                if ramp_type == 'bump':
+                    print('Sideband flat top bump with freq. modulation')
+                    print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n] + self.sb_n_detuning)
+                    self.set_pulse_registers(
+                        ch=self.sideband_ch,
+                        style="arb",
+                        freq=self.freq2reg(freq + shift - self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n] - self.sb_n_detuning),  # Chirp from the undriven f0g1 frequency
+                        phase=self.deg2reg(phase),
+                        gain=gain,
+                        waveform="sb_flat_top_bump_freq_mod")
+        
+        else: 
+            if pulse_type == 'const':
+                
+                # print('Sideband const')
                 self.set_pulse_registers(
-                    ch=self.sideband_ch,
-                    style="flat_top",
-                    freq=self.freq2reg(freq+shift),
-                    phase=self.deg2reg(phase),
-                    gain=gain,
-                    length=self.us2cycles(length),
-                    waveform="sb_flat_top_bump")
+                        ch=self.sideband_ch, 
+                        style="const", 
+                        freq=self.freq2reg(freq+shift), 
+                        phase=self.deg2reg(phase),
+                        gain=gain+gain_shift, 
+                        length=self.us2cycles(length))
+            
+            elif pulse_type == 'flat_top':
+                
+                if ramp_type == 'sin_squared':
+                    print('Sideband flat top sin squared')
+                    self.set_pulse_registers(
+                        ch=self.sideband_ch,
+                        style="flat_top",
+                        freq=self.freq2reg(freq+shift),
+                        phase=self.deg2reg(phase),
+                        gain=gain+gain_shift,
+                        length=self.us2cycles(length),
+                        waveform="sb_flat_top_sin_squared")
 
-            elif ramp_type == 'gaussian':
-                # print('Sideband flat top gaussian')
-                self.set_pulse_registers(
-                    ch=self.sideband_ch,
-                    style="flat_top",
-                    freq=self.freq2reg(freq+shift),
-                    phase=self.deg2reg(phase),
-                    gain=gain+gain_shift,
-                    length=self.us2cycles(length),
-                    waveform="sb_flat_top_gaussian")
+                elif ramp_type == 'bump':
+
+                    print('Sideband flat top bump')
+                    self.set_pulse_registers(
+                        ch=self.sideband_ch,
+                        style="flat_top",
+                        freq=self.freq2reg(freq+shift),
+                        phase=self.deg2reg(phase),
+                        gain=gain,
+                        length=self.us2cycles(length),
+                        waveform="sb_flat_top_bump")
+
+                elif ramp_type == 'gaussian':
+                    # print('Sideband flat top gaussian')
+                    self.set_pulse_registers(
+                        ch=self.sideband_ch,
+                        style="flat_top",
+                        freq=self.freq2reg(freq+shift),
+                        phase=self.deg2reg(phase),
+                        gain=gain+gain_shift,
+                        length=self.us2cycles(length),
+                        waveform="sb_flat_top_gaussian")
         
         self.pulse(ch=self.sideband_ch)
 
@@ -291,8 +315,6 @@ class fngnp1TwoPiBangBangProgram(AveragerProgram):
         self.sync_all()
 
         # repeatedly play fngnp1 pulse
-
-        
 
         if self.cfg.expt.relative_phase_bool:
             # print('Relative phase')

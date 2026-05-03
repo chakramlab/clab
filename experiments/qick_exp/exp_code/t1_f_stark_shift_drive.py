@@ -158,8 +158,18 @@ class T1FStarkShiftDriveProgram(AveragerProgram):
         self.play_pief_pulse()
         self.sync_all()
 
-        self.play_sb(freq=self.cfg.expt.drive_freq, length=self.cfg.expt.tau_placeholder, gain=cfg.expt.drive_gain, pulse_type='const', ramp_sigma=self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0])
-        self.sync_all()
+        sb_freq = self.cfg.expt.drive_freq
+        sb_sigma = self.cfg.expt.tau_placeholder  # Play for as long as the resolved pi-pulse
+        sb_gain = self.cfg.expt.drive_gain
+        sb_pulse_type = 'flat_top'
+        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
+        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
+                
+        print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+        
+        # self.play_sb(freq=self.cfg.expt.drive_freq, length=self.cfg.expt.tau_placeholder, gain=cfg.expt.drive_gain, pulse_type='const', ramp_sigma=self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0])
+        # self.sync_all()
 
         self.play_pief_pulse()
         self.sync_all()

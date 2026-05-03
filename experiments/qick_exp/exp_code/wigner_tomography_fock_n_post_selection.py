@@ -295,13 +295,16 @@ class WignerTomographyFockNPostSelectionProgram(AveragerProgram):
 
         # System Reset
 
-        if cfg.expt.cavity_reset_beginning:
-
+        if cfg.expt.reset_cavity_start:
+            print('Initializing transmon+cavity reset')
             self.cfg.device.soc.readout.reset_cavity_n =  1
 
-            for ii in range(cfg.device.soc.readout.reset_cycles):
+            
+            for mode in self.cfg.device.soc.readout.reset_cavity_start_modes:
 
-                print('Resetting System,', 'Cycle', ii)
+                print('Resetting mode in start:', mode+1)
+
+                # print('Resetting System,', 'Cycle', ii)
 
                 # Transmon Reset
 
@@ -313,7 +316,7 @@ class WignerTomographyFockNPostSelectionProgram(AveragerProgram):
                 sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_pulse_types[0]
                 sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
                 sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-                print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                 
                 self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                 self.sync_all()
@@ -350,17 +353,17 @@ class WignerTomographyFockNPostSelectionProgram(AveragerProgram):
                         chi_ge_cor = 0
                         chi_ef_cor = 0
 
-                    print('Resetting cavity for n =', ii)
+                    # print('Resetting cavity for n =', ii)
 
                     # setup and play f,n g,n+1 sideband pi pulse
 
-                    sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][ii]
-                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][ii]
-                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][ii]
-                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
-                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][ii]
-                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-                    print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+                    sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[mode][ii]
+                    sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[mode][ii]
+                    sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[mode][ii]
+                    sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[mode]
+                    sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[mode][ii]
+                    sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[mode]
+                    # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
                     self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
                     self.sync_all()
 
@@ -396,6 +399,8 @@ class WignerTomographyFockNPostSelectionProgram(AveragerProgram):
                     
                     self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
                     self.sync_all()
+
+        self.sync_all(self.us2cycles(self.cfg.device.soc.readout.reset_cavity_start_relax_delay))
 
         # Put n photons into cavity
 

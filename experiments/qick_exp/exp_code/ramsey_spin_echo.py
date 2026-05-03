@@ -49,7 +49,6 @@ class RamseySpinEchoProgram(RAveragerProgram):
         except: pulse_type = 'const'
 
         print ("pulse type = ",pulse_type)
-
         
             
         self.set_pulse_registers(

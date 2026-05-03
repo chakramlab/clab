@@ -10,7 +10,7 @@ from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
 
-class SidebandOptimalControlDetuningQubitCavityTomographyProgram(AveragerProgram):
+class SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestProgram(AveragerProgram):
     def initialize(self):
 
         # --- Initialize parameters ---
@@ -540,175 +540,178 @@ class SidebandOptimalControlDetuningQubitCavityTomographyProgram(AveragerProgram
                     detuning = sb_detunings[ii])
                 self.sync_all()
             
-        elif self.cfg.expt['0pn_prep']: 
+        # elif self.cfg.expt['0pn_prep']: 
             
-            # Put 0 + n photons into cavity
-            print(f'Initializing 0 + {self.cfg.expt.prep_n} photon state preparation')
+        #     # Put 0 + n photons into cavity
+        #     print(f'Initializing 0 + {self.cfg.expt.prep_n} photon state preparation')
 
-            for i in np.arange(self.cfg.expt.prep_n):
+        #     for i in np.arange(self.cfg.expt.prep_n):
 
-                if i == 0:
+        #         if i == 0:
                             
-                    # use piby2 ef pulse to avoid shelving on level 1
-                    self.play_pige_pulse()
-                    self.sync_all() 
+        #             # use piby2 ef pulse to avoid shelving on level 1
+        #             self.play_pige_pulse()
+        #             self.sync_all() 
                     
-                    self.play_piby2ef(phase=self.cfg.expt.state_prep_phase)
-                    self.sync_all()
+        #             self.play_piby2ef(phase=self.cfg.expt.state_prep_phase)
+        #             self.sync_all()
 
-                    if self.cfg.expt.prep_n == 1:
-                        self.play_pige_pulse()
-                        self.sync_all()
+        #             if self.cfg.expt.prep_n == 1:
+        #                 self.play_pige_pulse()
+        #                 self.sync_all()
                 
-                else:
-                    self.play_pige_pulse(shift = i*chi_e/2)
-                    self.sync_all()
+        #         else:
+        #             self.play_pige_pulse(shift = i*chi_e/2)
+        #             self.sync_all()
 
-                    self.play_pief_pulse(shift = i*chi_f)
-                    self.sync_all()
+        #             self.play_pief_pulse(shift = i*chi_f)
+        #             self.sync_all()
 
-                    #shelving pulse
-                    if i != self.cfg.expt.prep_n-1:
-                        self.play_pige_pulse(shift = 0) # always acts on 0 peak # (i+1)*self.chi_e/2)
-                        self.sync_all()
+        #             #shelving pulse
+        #             if i != self.cfg.expt.prep_n-1:
+        #                 self.play_pige_pulse(shift = 0) # always acts on 0 peak # (i+1)*self.chi_e/2)
+        #                 self.sync_all()
 
-                sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][i]
-                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][i]
-                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][i]
-                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
-                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
-                # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+        #         sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][i]
+        #         sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][i]
+        #         sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][i]
+        #         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
+        #         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+        #         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
+        #         # print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
 
-                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
-                self.sync_all()
+        #         self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+        #         self.sync_all()
 
-        else:
+        # else:
 
-            # Put n photons into cavity 
+        #     # Put n photons into cavity 
 
-            for i in np.arange(self.cfg.expt.prep_n):
+        #     for i in np.arange(self.cfg.expt.prep_n):
 
-                # setup and play qubit ge pi pulse
+        #         # setup and play qubit ge pi pulse
 
-                self.play_pige_pulse(shift=chi_e * i)
-                self.sync_all()
+        #         self.play_pige_pulse(shift=chi_e * i)
+        #         self.sync_all()
 
-                # setup and play qubit ef pi pulse
+        #         # setup and play qubit ef pi pulse
 
-                self.play_pief_pulse(shift=chi_ef * i)
-                self.sync_all()
+        #         self.play_pief_pulse(shift=chi_ef * i)
+        #         self.sync_all()
 
-                # setup and play f,n g,n+1 sideband pi pulse
+        #         # setup and play f,n g,n+1 sideband pi pulse
 
-                sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][i]
-                sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][i]
-                sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][i]
-                sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
-                sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
-                sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
-                # print('Loading photon: playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
-                self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
-                self.sync_all()
+        #         sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][i]
+        #         sb_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_times[self.cfg.expt.mode][i]
+        #         sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][i]
+        #         sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
+        #         sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][i]
+        #         sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+        #         # print('Loading photon: playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
+        #         self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+        #         self.sync_all()
         
         # Post-selection after state preparation
 
         if self.cfg.expt.state_prep_post_select:
-
             print('Post-selecting on state preparation')
 
-            # Readout kick pulse
+            for ii in range(self.cfg.expt.state_prep_post_select_n):
+                print(f'Post-selection n: {ii}')
 
-            if self.cfg.device.soc.readout.kick_pulse:
-                # print('Playing kick pulse')
+
+                # Readout kick pulse
+
+                if self.cfg.device.soc.readout.kick_pulse:
+                    # print('Playing kick pulse')
+                    self.set_pulse_registers(
+                        ch=self.cfg.device.soc.resonator.ch,
+                        style="const",
+                        freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                        phase=self.deg2reg(0),
+                        gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                        length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+                    
+                    self.pulse(ch=self.cfg.device.soc.resonator.ch)
+                    self.sync_all()
+
+                # Readout 
+
                 self.set_pulse_registers(
                     ch=self.cfg.device.soc.resonator.ch,
                     style="const",
                     freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
                     phase=self.deg2reg(0),
-                    gain=self.cfg.device.soc.readout.kick_pulse_gain,
-                    length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+                    gain=self.cfg.device.soc.resonator.gain,
+                    length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
                 
-                self.pulse(ch=self.cfg.device.soc.resonator.ch)
-                self.sync_all()
+                self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
+                            adcs=[0],
+                            adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
+                            wait=True,
+                            syncdelay=self.us2cycles(self.cfg.device.soc.readout.readout_reset_wait_time))  # sync all channels
+                
+                # Reset of readout cavity
+                self.set_pulse_registers(
+                    ch=self.res_ch,
+                    style="const",
+                    freq=self.readout_freq, 
+                    phase=self.deg2reg(cfg.device.soc.readout.readout_reset_phase, gen_ch=self.res_ch), # 0 degrees
+                    gain=self.cfg.device.soc.readout.readout_reset_gain, 
+                    length=self.us2cycles(cfg.device.soc.readout.readout_reset_length))
+                self.pulse(ch=self.res_ch)
+                self.sync_all(self.us2cycles(cfg.device.soc.readout.post_selection_wait_time))
 
-            # Readout 
+        # qubit_thetas = cfg.expt.qubit_thetas
+        # qubit_phis = cfg.expt.qubit_phis
+        # sb_phis = cfg.expt.sb_phis
+        # sb_detunings = cfg.expt.sb_detunings
 
-            self.set_pulse_registers(
-                ch=self.cfg.device.soc.resonator.ch,
-                style="const",
-                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
-                phase=self.deg2reg(0),
-                gain=self.cfg.device.soc.resonator.gain,
-                length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+        # for ii in range(len(qubit_thetas)):
+
+        #     self.play_pief_pulse()
+        #     self.sync_all()
+
+        #     pi_gain = self.cfg.device.soc.qubit.pulses.pi_ge.gain
+        #     theta_gain = int(qubit_thetas[ii] / 180 * pi_gain)
+        #     print(f'Layer {ii}:')
+        #     print('Theta_gain:', theta_gain)
+        #     print('Qubit_phi:', qubit_phis[ii])
+        #     print('Sideband_phi:', sb_phis[ii])
+        #     print('Sideband_detuning (MHz):', sb_detunings[ii])
             
-            self.measure(pulse_ch=self.cfg.device.soc.resonator.ch,
-                        adcs=[0],
-                        adc_trig_offset=self.us2cycles(self.cfg.device.soc.readout.adc_trig_offset),
-                        wait=True,
-                        syncdelay=self.us2cycles(self.cfg.device.soc.readout.readout_reset_wait_time))  # sync all channels
-            
-            # Reset of readout cavity
-            self.set_pulse_registers(
-                ch=self.res_ch,
-                style="const",
-                freq=self.readout_freq, 
-                phase=self.deg2reg(cfg.device.soc.readout.readout_reset_phase, gen_ch=self.res_ch), # 0 degrees
-                gain=self.cfg.device.soc.readout.readout_reset_gain, 
-                length=self.us2cycles(cfg.device.soc.readout.readout_reset_length))
-            self.pulse(ch=self.res_ch)
-            self.sync_all(self.us2cycles(cfg.device.soc.readout.post_selection_wait_time))
+        #     self.play_ge_pulse(gain=theta_gain, phase=qubit_phis[ii])
+        #     self.sync_all()
 
-        qubit_thetas = cfg.expt.qubit_thetas
-        qubit_phis = cfg.expt.qubit_phis
-        sb_phis = cfg.expt.sb_phis
-        sb_detunings = cfg.expt.sb_detunings
-
-        for ii in range(len(qubit_thetas)):
-
-            self.play_pief_pulse()
-            self.sync_all()
-
-            pi_gain = self.cfg.device.soc.qubit.pulses.pi_ge.gain
-            theta_gain = int(qubit_thetas[ii] / 180 * pi_gain)
-            print(f'Layer {ii}:')
-            print('Theta_gain:', theta_gain)
-            print('Qubit_phi:', qubit_phis[ii])
-            print('Sideband_phi:', sb_phis[ii])
-            print('Sideband_detuning (MHz):', sb_detunings[ii])
-            
-            self.play_ge_pulse(gain=theta_gain, phase=qubit_phis[ii])
-            self.sync_all()
-
-            self.play_pief_pulse()
-            self.sync_all()
+        #     self.play_pief_pulse()
+        #     self.sync_all()
         
-            self.play_sb(
-                freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n],
-                gain= self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n], 
-                pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode],
-                ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode],
-                ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n],
-                phase = sb_phis[ii],    
-                stark_shift_idle_correction = True,
-                detuning = sb_detunings[ii])
-            self.sync_all()
+        #     self.play_sb(
+        #         freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n],
+        #         gain= self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n], 
+        #         pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode],
+        #         ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode],
+        #         ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n],
+        #         phase = sb_phis[ii],    
+        #         stark_shift_idle_correction = True,
+        #         detuning = sb_detunings[ii])
+        #     self.sync_all()
 
-            print('Sideband gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][0])
+        #     print('Sideband gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][0])
 
-            # Length is initialized by the custom freq. modulated pulse
+        #     # Length is initialized by the custom freq. modulated pulse
 
-            # print('Qubit theta (degree):', qubit_thetas[ii])
-            # print('Qubit phi (degree):', qubit_phis[ii])
-            # print('Sideband phi (degree):', sb_phis[ii])
-            # print('Sideband length (us):', self.cfg.device.soc.sideband.pulses.fngnp1twopi_times[self.cfg.expt.mode][self.cfg.expt.n])
-            # print('Sideband gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n])
-            # print('Sideband frequency (MHz):', self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n])
-            # print('Sideband ramp sigma (us):', self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n])
-            # print('Sideband ramp type:', self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode])
+        #     # print('Qubit theta (degree):', qubit_thetas[ii])
+        #     # print('Qubit phi (degree):', qubit_phis[ii])
+        #     # print('Sideband phi (degree):', sb_phis[ii])
+        #     # print('Sideband length (us):', self.cfg.device.soc.sideband.pulses.fngnp1twopi_times[self.cfg.expt.mode][self.cfg.expt.n])
+        #     # print('Sideband gain:', self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][self.cfg.expt.n])
+        #     # print('Sideband frequency (MHz):', self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][self.cfg.expt.n])
+        #     # print('Sideband ramp sigma (us):', self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][self.cfg.expt.n])
+        #     # print('Sideband ramp type:', self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode])
         
-        self.play_pief_pulse()  # Map |f> states back to |e>
-        self.sync_all()
+        # self.play_pief_pulse()  # Map |f> states back to |e>
+        # self.sync_all()
         
         # # Reset |e>
         # print('Resetting |e> state')
@@ -869,7 +872,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyProgram(AveragerProgram
         shots_q0 = self.dq_buf[0].reshape((cfg.expt.reps, cfg.expt.n_meas)) / self.us2cycles(cfg.device.soc.readout.length - self.cfg.device.soc.readout.adc_trig_offset, ro_ch=self.cfg.device.soc.readout.ch[0])
         return shots_i0, shots_q0
     
-class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
+class SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestExperiment(Experiment):
     """Qubit Spectroscopy Experiment
        Experimental Config
         expt={"start":4020, "step":0.35, "expts":300, "reps": 200,"rounds":50,
@@ -938,7 +941,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
                 self.cfg.expt.pi_flip = False
                 # print('Gain = ', i, 'Phase = ', j)
                 soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyProgram(soc, self.cfg)
+                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestProgram(soc, self.cfg)
                 avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
                 i_shots, q_shots = wigtom.collect_shots()
                 i_shots_col.append(i_shots)
@@ -972,7 +975,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
                 self.cfg.expt.pi_flip = False
                 # print('Gain = ', i, 'Phase = ', j)
                 soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyProgram(soc, self.cfg)
+                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestProgram(soc, self.cfg)
                 avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
                 i_shots, q_shots = wigtom.collect_shots()
                 i_shots_col.append(i_shots)
@@ -1006,7 +1009,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
                 self.cfg.expt.pi_flip = True
                 # print('Gain = ', i, 'Phase = ', j)
                 soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyProgram(soc, self.cfg)
+                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestProgram(soc, self.cfg)
                 avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
                 i_shots, q_shots = wigtom.collect_shots()
                 i_shots_pi_flip_col.append(i_shots)
@@ -1039,7 +1042,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
                 self.cfg.expt.pi_flip = False
                 # print('Gain = ', i, 'Phase = ', j)
                 soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyProgram(soc, self.cfg)
+                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestProgram(soc, self.cfg)
                 avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
                 i_shots, q_shots = wigtom.collect_shots()
                 i_shots_x_col.append(i_shots)
@@ -1088,7 +1091,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
                 self.cfg.expt.tomography_pulsetype = 'pi2_y'
                 # print('Gain = ', i, 'Phase = ', j)
                 soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyProgram(soc, self.cfg)
+                wigtom=SidebandOptimalControlDetuningQubitCavityTomographyPostSelectionTestProgram(soc, self.cfg)
                 avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
                 i_shots, q_shots = wigtom.collect_shots()
                 i_shots_y_col.append(i_shots)
@@ -1104,7 +1107,7 @@ class SidebandOptimalControlDetuningQubitCavityTomographyExperiment(Experiment):
             #     self.cfg.expt.tomography_pulsetype = 'pi2_y'
             #     print('Gain = ', i, 'Phase = ', j)
             #     soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            #     wigtom=SidebandOptimalControlQubitCavityTomographyProgram(soc, self.cfg)
+            #     wigtom=SidebandOptimalControlQubitCavityTomographyPostSelectionTestProgram(soc, self.cfg)
             #     avgi, avgq = wigtom.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
             #     i_shots, q_shots = wigtom.collect_shots()
             #     i_shots_y_pi_flip_col.append(i_shots)

@@ -7,7 +7,8 @@ from slab import Experiment, dsfit, AttrDict
 from tqdm import tqdm_notebook as tqdm
 
 
-class T1StarkShiftDriveProgram(AveragerProgram):
+class RamseySpinEchoProgram(RAveragerProgram):
+
     def initialize(self):
         cfg = AttrDict(self.cfg)
         self.cfg.update(cfg.expt)
@@ -16,15 +17,22 @@ class T1StarkShiftDriveProgram(AveragerProgram):
         self.qubit_ch = cfg.device.soc.qubit.ch
         
         self.q_rp = self.ch_page(self.qubit_ch)     # get register page for qubit_ch
-        self.r_wait = 3
+        self.r_wait = 3# self.sreg(self.qubit_ch, "time")
         self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
+
+        self.r_phase2 = 4
+        self.r_phase = self.sreg(self.qubit_ch, "phase")
+        #self.r_phase = 0
+        self.safe_regwi(self.q_rp, self.r_wait, self.us2cycles(cfg.expt.start))
+        self.safe_regwi(self.q_rp, self.r_phase2, 0)
         
         self.f_res=self.freq2reg(cfg.device.soc.readout.freq, gen_ch=self.res_ch, ro_ch=cfg.device.soc.readout.ch[0])  # convert f_res to dac register value
         self.readout_length=self.us2cycles(cfg.device.soc.readout.length)
         # self.cfg["adc_lengths"]=[self.readout_length]*2     #add length of adc acquisition to config
         # self.cfg["adc_freqs"]=[adcfreq(cfg.device.soc.readout.frequency)]*2   #add frequency of adc ddc to config
         
-        self.pisigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge.sigma)
+        self.piby2sigma = self.us2cycles(cfg.device.soc.qubit.pulses.pi2_ge.sigma)
+        self.piby2gain = cfg.device.soc.qubit.pulses.pi2_ge.gain
         # print(self.sigma)
 
         self.declare_gen(ch=self.res_ch, nqz=self.cfg.device.soc.resonator.nyqist) 
@@ -36,8 +44,24 @@ class T1StarkShiftDriveProgram(AveragerProgram):
                                  freq=cfg.device.soc.readout.freq, 
                                  gen_ch=self.cfg.device.soc.resonator.ch)
 
+        # add qubit and readout pulses to respective channels
+        try: pulse_type = cfg.device.soc.qubit.pulses.pi2_ge.pulse_type
+        except: pulse_type = 'const'
 
-        # add readout pulses to respective channels
+        print ("pulse type = ",pulse_type)
+
+        try: 
+            cpmg = cfg.expt.cpmg
+            print('CPMG mode = ', cpmg)
+            if cpmg:pi_phase = 90
+            else:
+                pi_phase = 0
+
+        except:
+            cpmg = False
+            pi_phase = 0
+
+
         
             
         self.set_pulse_registers(
@@ -47,39 +71,13 @@ class T1StarkShiftDriveProgram(AveragerProgram):
             phase=self.deg2reg(cfg.device.soc.resonator.phase, gen_ch=self.res_ch),
             gain=cfg.device.soc.resonator.gain,
             length=self.readout_length)
-
+        
         self.sideband_ch = cfg.device.soc.sideband.ch
         self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.device.soc.sideband.nyqist)
-
-        self.sigma_ef = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ef.sigma, gen_ch=self.qubit_ch)
-        self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
         
         self.sync_all(self.us2cycles(0.2))
-    
-    def play_pief_pulse(self, phase = 0, shift = 0):
-            
-        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
 
-            self.set_pulse_registers(
-                    ch=self.qubit_ch, 
-                    style="const", 
-                    freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift), 
-                    phase=self.deg2reg(phase),
-                    gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain, 
-                    length=self.sigma_ef)
-            
-        if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
-            
-            self.set_pulse_registers(
-                ch=self.qubit_ch,
-                style="arb",
-                freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef + shift),
-                phase=self.deg2reg(phase),
-                gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
-                waveform="qubit_ef")
-        
-        self.pulse(ch=self.qubit_ch)  
-        
+
     def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0):
         
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(ramp_sigma), length=self.us2cycles(ramp_sigma) * 4)
@@ -123,13 +121,11 @@ class T1StarkShiftDriveProgram(AveragerProgram):
         # self.mathi(self.s_rp, self.s_freq, self.s_freq2, "+", 0)
         self.pulse(ch=self.sideband_ch)
 
-    def body(self):
-        cfg=AttrDict(self.cfg)
 
-        try: pulse_type = cfg.device.soc.qubit.pulses.pi_ge.pulse_type
-        except: pulse_type = 'const'
-        
-        print ("pulse type = ",pulse_type)
+    def body(self):
+        cfg = AttrDict(self.cfg)
+
+        # Setup and play pi/2_ge qubit pulse
 
         if pulse_type == 'const':
 
@@ -138,37 +134,48 @@ class T1StarkShiftDriveProgram(AveragerProgram):
                 style="const", 
                 freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
                 phase=0,
-                gain=cfg.device.soc.qubit.pulses.pi_ge.gain, 
-                length=self.pisigma)
-            
-        elif pulse_type == 'gauss':
+                gain=self.piby2gain, 
+                length=self.piby2sigma)
 
-            self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.pisigma, length=self.pisigma * 4)
+        elif pulse_type == 'gauss':
+            self.add_gauss(ch=self.qubit_ch, name="qubit", sigma=self.piby2sigma, length= self.piby2sigma* 4)
             self.set_pulse_registers(
                 ch=self.qubit_ch,
                 style="arb",
                 freq=self.freq2reg(cfg.device.soc.qubit.f_ge),
                 phase=self.deg2reg(0),
-                gain=cfg.device.soc.qubit.pulses.pi_ge.gain,
+                gain= self.piby2gain,
                 waveform="qubit")
-                
-        self.pulse(ch=self.qubit_ch)  # play pi pulse
+            print('Pulse type set to gauss')
+
+        self.safe_regwi(self.q_rp, self.r_phase, 0)
+        self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
         self.sync_all()
 
-        sb_freq = self.cfg.expt.drive_freq
-        sb_sigma = self.cfg.expt.tau_placeholder  # Play for as long as the resolved pi-pulse
-        sb_gain = self.cfg.expt.drive_gain
-        sb_pulse_type = 'flat_top'
-        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0]
-        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_types[0]
-                
-        print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
-        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+        for i in np.arange(self.n):
 
-        self.sync_all()
+            self.sync(self.q_rp, self.wait_time)
+            self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                phase=0,
+                gain=self.pigain, 
+                length=self.pisigma)
+            self.pulse(ch=self.qubit_ch)
+        
+        # Setup and play pi/2_ge qubit pulse
 
-        # self.play_sb(freq=self.cfg.expt.drive_freq, length=self.cfg.expt.tau_placeholder, gain=cfg.expt.drive_gain, pulse_type='const', ramp_sigma=self.cfg.device.soc.sideband.pulses.fngnp1_readout_ramp_sigmas[0])
-        # self.sync_all()
+        self.set_pulse_registers(
+                ch=self.qubit_ch, 
+                style="const", 
+                freq=self.freq2reg(cfg.device.soc.qubit.f_ge), 
+                phase=0,
+                gain=self.piby2gain, 
+                length=self.piby2sigma)
+        
+        self.pulse(ch=self.qubit_ch)  # play pi/2 pulse
+        self.sync_all(self.us2cycles(0.05))  # align channels and wait 50ns
 
         # Readout kick pulse
 
@@ -201,6 +208,7 @@ class T1StarkShiftDriveProgram(AveragerProgram):
                      wait=True,
                      syncdelay=self.us2cycles(self.cfg.device.soc.readout.relax_delay))  # sync all channels
 
+        
         # Transmon Reset
 
         if cfg.expt.reset:
@@ -224,7 +232,27 @@ class T1StarkShiftDriveProgram(AveragerProgram):
 
                 # pi_ef
 
-                self.play_pief_pulse()
+                if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'const':
+
+                    self.set_pulse_registers(
+                        ch=self.qubit_ch,
+                        style="const",
+                        freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+                        phase=self.deg2reg(0),
+                        gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+                        length=self.us2cycles(self.cfg.device.soc.qubit.pulses.pi_ef.sigma))
+                
+                if self.cfg.device.soc.qubit.pulses.pi_ef.pulse_type == 'gauss':
+
+                    self.set_pulse_registers(
+                        ch=self.qubit_ch,
+                        style="arb",
+                        freq=self.freq2reg(self.cfg.device.soc.qubit.f_ef),
+                        phase=self.deg2reg(0),
+                        gain=self.cfg.device.soc.qubit.pulses.pi_ef.gain,
+                        waveform="pi_ef")
+
+                self.pulse(ch=self.qubit_ch)
                 self.sync_all()
 
                 # f0g1 to readout mode
@@ -242,73 +270,71 @@ class T1StarkShiftDriveProgram(AveragerProgram):
 
             self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
-                      
-class T1StarkShiftDriveExperiment(Experiment):
-    """T1 Experiment
+    def update(self):
+        self.mathi(self.q_rp, self.r_wait, self.r_wait, '+',
+                   self.us2cycles(self.cfg.expt.step))  # update the time between two π/2 pulses
+        self.mathi(self.q_rp, self.r_phase2, self.r_phase2, '+',
+                   self.deg2reg(self.cfg.expt.phase_step, gen_ch=self.qubit_ch))  # advance the phase of the LO for the second π/2 pulse
+
+
+class RamseySpinEchoExperiment(Experiment):
+    """Ramsey Experiment
        Experimental Config
-        expt =  {"start":0, "step": 1, "expts":200, "reps": 10, "rounds": 200}
+        expt = {"start":0, "step": 1, "expts":200, "reps": 10, "rounds": 200, "phase_step": deg2reg(360/50)}
+         }
     """
 
-    def __init__(self, path='', prefix='T1', config_file=None, progress=None):
-        super().__init__(path=path,prefix=prefix, config_file=config_file, progress=False)
+    def __init__(self, path='', prefix='Ramsey', config_file=None, progress=None):
+        super().__init__(path=path, prefix=prefix, config_file=config_file, progress=progress)
 
-    def acquire(self, progress=False, debug=False, data_path=None, filename=None, prob_calib=True):
+    def acquire(self, progress=False, debug=False, data_path=None, filename=None):
+        fpts = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
+        soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
+        ramsey = RamseySpinEchoProgram(soc, self.cfg)
+        print(self.im[self.cfg.aliases.soc], 'test0')
+        xpts, avgi, avgq = ramsey.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress, debug=debug)
         
-        x_pts = self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
-        avgi_col = []
-        avgq_col = []
 
-        for i in tqdm(np.arange(len(x_pts)), disable = not progress):
-            self.cfg.expt.tau_placeholder = x_pts[i]
-            soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            t1 = T1StarkShiftDriveProgram(soc, self.cfg)
-            avgi, avgq = t1.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)
-            avgi_col.append(avgi[0][0])
-            avgq_col.append(avgq[0][0]) 
-
-        avgi_col = np.array(avgi_col)
-        avgq_col = np.array(avgq_col)
-         
-        iq_calib = self.qubit_prob_calib(path=self.path, config_file=self.config_file)
-    
-        i_prob, q_prob = self.get_qubit_prob(avgi_col, avgq_col, iq_calib['i_g'], iq_calib['q_g'], iq_calib['i_e'], iq_calib['q_e'])
-
-        data_dict = {'xpts':x_pts, 'avgi':avgi_col, 'avgq':avgq_col, 'avgi_prob': i_prob, 'avgq_prob': q_prob}
+        avgi_rot, avgq_rot = self.iq_rot(avgi[0][0], avgq[0][0], self.cfg.device.soc.readout.iq_rot_theta)
+        data_dict = {'xpts':xpts, 'avgi':avgi[0][0], 'avgq':avgq[0][0], 'avgi_rot':avgi_rot, 'avgq_rot':avgq_rot}
 
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
-
+            
         return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:
-            data=self.data
-        
-        pI = dsfit.fitexp(data['xpts'], data['avgi'][0][0], fitparams=None, showfit=False)
-        pQ = dsfit.fitexp(data['xpts'], data['avgq'][0][0], fitparams=None, showfit=False)
-        # adding this due to extra parameter in decaysin that is not in fitdecaysin
-        pI = np.append(pI, data['xpts'][0])
-        pQ = np.append(pQ, data['xpts'][0]) 
+            data = self.data
+
+        pI = dsfit.fitdecaysin(data['xpts'], data['avgi'][0][0], fitparams=None, showfit=False)
+        pQ = dsfit.fitdecaysin(data['xpts'], data['avgq'][0][0], fitparams=None, showfit=False)
+
         data['fiti'] = pI
         data['fitq'] = pQ
-        print("T1:", data['fiti'][3], data['fitq'][3])
-        
+        corr_freq = (self.cfg.device.qubit.f_ge) - data['fiti'][1]
+        data['corr_freq'] = corr_freq
+
         return data
 
     def display(self, data=None, **kwargs):
         if data is None:
-            data=self.data
+            data = self.data
         print(self.fname)
-        # Writing in progress, may want to edit in the future to plot time instead of clock cycles
-        plt.figure(figsize=(10,8))
-        plt.subplot(211,title="T1",  ylabel="I")
-        plt.plot(data["xpts"], data["avgi"][0][0],'o-')
+
+            # Writing in progress, may want to edit in the future to plot time instead of clock cycles
+        plt.figure(figsize=(10, 8))
+        plt.subplot(211, title="Ramsey", ylabel="I")
+        plt.plot(data["xpts"], data["avgi"][0][0], 'o')
         if "fiti" in data:
-            plt.plot(data["xpts"], dsfit.expfunc(data["fiti"], data["xpts"]))
-        plt.subplot(212, xlabel="Wait Time (us)", ylabel="Q")
-        plt.plot(data["xpts"], data["avgq"][0][0],'o-')
+            plt.plot(data["xpts"], dsfit.decaysin(data["fiti"], data["xpts"]))
+        plt.subplot(212, xlabel="Delay (us)", ylabel="Q")
+        plt.plot(data["xpts"], data["avgq"][0][0], 'o')
         if "fitq" in data:
-            plt.plot(data["xpts"], dsfit.expfunc(data["fitq"], data["xpts"]))
-            
+            plt.plot(data["xpts"], dsfit.decaysin(data["fitq"], data["xpts"]))
+
         plt.tight_layout()
         plt.show()
+
+
+

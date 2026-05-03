@@ -341,11 +341,7 @@ class AmplitudeRabiEFExperiment(Experiment):
             data["amps"].append(amp)
             data["phases"].append(phase)
 
-        for k, a in data.items():
-            data[k] = np.array(a)
-
-        self.data = data
-
+        
         avgi_col = np.array([data["avgi"][i][0][0] for i in range(len(data['avgi']))])
         avgq_col = np.array([data["avgq"][i][0][0] for i in range(len(data['avgq']))])
 
@@ -364,7 +360,7 @@ class AmplitudeRabiEFExperiment(Experiment):
         if data_path and filename:
             self.save_data(data_path=data_path, filename=filename, arrays=data_dict)
 
-        return data
+        return data_dict
 
     def analyze(self, data=None, **kwargs):
         if data is None:

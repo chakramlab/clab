@@ -10,7 +10,7 @@ from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
 
-class PhotonNumberResolvedQSpecChiEngineeringProgram(AveragerProgram):
+class PhotonNumberResolvedQSpecReadoutDriveProgram(AveragerProgram):
     def initialize(self):
 
         # --- Initialize parameters ---
@@ -86,7 +86,7 @@ class PhotonNumberResolvedQSpecChiEngineeringProgram(AveragerProgram):
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
         if self.cfg.expt.qubit_prep_pulse_type == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_prep", sigma=self.us2cycles(self.cfg.expt.qubit_prep_length), length=self.us2cycles(self.cfg.expt.qubit_prep_length) * 4)
-        self.add_gauss(ch=self.cavdr_ch, name="cavdr", sigma=self.us2cycles(self.cfg.expt.cavdr_length), length=self.us2cycles(self.cfg.expt.cavdr_length)* 4)
+        # self.add_gauss(ch=self.cavdr_ch, name="cavdr", sigma=self.us2cycles(self.cfg.expt.cavdr_length), length=self.us2cycles(self.cfg.expt.cavdr_length)* 4)
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_ramp_sigma), length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2)
         self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_ramp_sigma) * 2, k=2, flat_top_fraction=0.0)
@@ -240,42 +240,89 @@ class PhotonNumberResolvedQSpecChiEngineeringProgram(AveragerProgram):
             print('No cavity drive.')
 
         
-        self.sigma_ge_resolved = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma, gen_ch=self.qubit_resolved_ch)
+        if self.cfg.expt.readout_drive:
+            # Play readout drive
 
-        self.qubit_pulsetype = cfg['device']['soc']['qubit']['pulses']['pi_ge_resolved']['pulse_type']
+            # Readout kick pulse
 
-        if self.qubit_pulsetype == 'gauss':
-            self.add_gauss(ch=self.qubit_resolved_ch, name="qubit_ge_resolved", sigma=self.sigma_ge_resolved, length=self.sigma_ge_resolved * 4)
+            print('Playing readout drive before qubit pulse')
+
+            if self.cfg.device.soc.readout.kick_pulse:
+                print('Playing kick pulse')
+                self.set_pulse_registers(
+                    ch=self.cfg.device.soc.resonator.ch,
+                    style="const",
+                    freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                    phase=self.deg2reg(0),
+                    gain=self.cfg.device.soc.readout.kick_pulse_gain,
+                    length=self.us2cycles(self.cfg.device.soc.readout.kick_pulse_length))
+                
+                self.pulse(ch=self.cfg.device.soc.resonator.ch)
+                self.sync_all()
+
+            # Readout 
+
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.resonator.gain,
+                length=self.us2cycles(self.cfg.device.soc.readout.length, gen_ch=self.cfg.device.soc.resonator.ch))
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
+            self.sync_all()
+
+        # Play qubit pulse along with readout drive
+
+        if self.cfg.expt.resolved_channel:
+            channel = self.qubit_resolved_ch
+        else:
+            channel = self.qubit_ch
+
+        self.sigma_ge_resolved = self.us2cycles(self.cfg.expt.qubit_drive_length, gen_ch=channel)
+
+        # self.qubit_pulsetype = cfg['device']['soc']['qubit']['pulses']['pi_ge_resolved']['pulse_type']
+
+        if self.cfg.expt.qubit_pulse_type == 'gauss':
+            self.add_gauss(ch=channel, name="qubit_ge_resolved", sigma=self.sigma_ge_resolved, length=self.sigma_ge_resolved * 4)
     
             self.set_pulse_registers(
-                ch=self.qubit_resolved_ch,
+                ch=channel,
                 style="arb",
                 freq=self.freq2reg(self.qubit_freq_placeholder),
                 phase=self.deg2reg(0),
-                gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain,
+                gain=self.cfg.expt.qubit_drive_gain,
                 waveform="qubit_ge_resolved")
-        
-        if self.qubit_pulsetype == 'const':
+            pulse_time = self.cfg.expt.qubit_drive_length * 4
+
+        elif self.cfg.expt.qubit_pulse_type == 'const':
             self.set_pulse_registers(
-                    ch=self.qubit_resolved_ch, 
+                    ch=channel, 
                     style="const", 
                     freq=self.freq2reg(self.qubit_freq_placeholder),
                     phase=0,
-                    gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain, 
+                    gain=self.cfg.expt.qubit_drive_gain, 
                     length=self.sigma_ge_resolved)
             
-        self.pulse(ch=self.qubit_resolved_ch)
+            pulse_time = self.cfg.expt.qubit_drive_length
+            
+        self.pulse(ch=channel)
 
-        sb_freq = self.cfg.expt.h0e1_freq + self.cfg.expt.h0e1_detuning
-        sb_sigma = cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma * 4  # Play for as long as the resolved pi-pulse
-        sb_gain = self.cfg.expt.h0e1_gain
-        sb_pulse_type = self.cfg.expt.h0e1_pulse_type
-        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.hnenp1pi_ramp_sigmas[self.cfg.expt.mode][0]
-        sb_ramp_type = self.cfg.device.soc.sideband.pulses.hnenp1pi_ramp_types[self.cfg.expt.mode]
-        print('Playing sideband h0e1 pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma))
-        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type,ramp_sigma=sb_ramp_sigma)
+    
+        if self.cfg.expt.readout_drive:
+            self.set_pulse_registers(
+                ch=self.cfg.device.soc.resonator.ch,
+                style="const",
+                freq=self.freq2reg(self.cfg.device.soc.readout.freq, gen_ch=self.cfg.device.soc.resonator.ch, ro_ch=self.cfg.device.soc.readout.ch[0]),
+                phase=self.deg2reg(0),
+                gain=self.cfg.device.soc.resonator.gain,
+                length=self.us2cycles(pulse_time, gen_ch=self.cfg.device.soc.resonator.ch))  # Play for as long as the resolved pi-pulse
+            
+            self.pulse(ch=self.cfg.device.soc.resonator.ch)
 
-        self.sync_all()
+        self.sync_all(self.us2cycles(self.cfg.expt.readout_delay))
+
 
         # Readout kick pulse
 
@@ -293,7 +340,7 @@ class PhotonNumberResolvedQSpecChiEngineeringProgram(AveragerProgram):
             self.sync_all()
 
         # Readout 
-
+        
         self.set_pulse_registers(
             ch=self.cfg.device.soc.resonator.ch,
             style="const",
@@ -474,7 +521,7 @@ class PhotonNumberResolvedQSpecChiEngineeringProgram(AveragerProgram):
                     self.sync_all(self.us2cycles(cfg.device.soc.readout.relax_delay))
 
 
-class PhotonNumberResolvedQSpecChiEngineeringExperiment(Experiment):
+class PhotonNumberResolvedQSpecReadoutDriveExperiment(Experiment):
     """Qubit Spectroscopy Experiment
        Experimental Config
         expt={"start":4020, "step":0.35, "expts":300, "reps": 200,"rounds":50,
@@ -494,7 +541,7 @@ class PhotonNumberResolvedQSpecChiEngineeringExperiment(Experiment):
         for i in tqdm(fpts, disable = not progress):
             self.cfg.expt.freq_placeholder = i
             soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-            qspec=PhotonNumberResolvedQSpecChiEngineeringProgram(soc, self.cfg)
+            qspec=PhotonNumberResolvedQSpecReadoutDriveProgram(soc, self.cfg)
             avgi, avgq = qspec.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=False) 
 
             avgi_col.append(avgi[0][0])

@@ -216,6 +216,7 @@ class fngnp1RabiReadoutProgram(AveragerProgram):
             self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
             self.sync_all()
 
+
         if self.cfg.expt.chi_correction:
             chi_ge_cor = chi_e * self.cfg.expt.n
             chi_ef_cor = (chi_f - chi_e) * self.cfg.expt.n
@@ -224,15 +225,20 @@ class fngnp1RabiReadoutProgram(AveragerProgram):
             chi_ef_cor = 0
         print('Probe chi correction:', 'chi_ge_cor', chi_ge_cor, 'chi_ef_cor', chi_ef_cor)
 
-        # pi_ge
+        if self.cfg.expt.no_prep:
+            print('No prep.')
             
-        self.play_pige_pulse(phase=0, shift=chi_ge_cor) 
-        self.sync_all()
+        else:
+            # pi_ge
+                
+            self.play_pige_pulse(phase=0, shift=chi_ge_cor) 
+            self.sync_all()
 
-        # pi_ef 
+            # pi_ef 
 
-        self.play_pief_pulse(phase=0, shift=chi_ef_cor)
-        self.sync_all()
+            self.play_pief_pulse(phase=0, shift=chi_ef_cor)
+            self.sync_all()
+            
 
         # fngnp1 vs time pulse
 

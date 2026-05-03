@@ -10,7 +10,7 @@ from qick import *
 from qick.helpers import gauss
 from slab import Experiment, dsfit, AttrDict
 
-class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
+class ResonatorSpectroscopyViaQubitStarkShiftProgram(RAveragerProgram):
     def initialize(self):
 
         # --- Initialize parameters ---
@@ -94,6 +94,8 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
                 gain=self.cavdr_gain,
                 length=self.cavdr_length)
             
+            self.length = self.cfg.expt.length
+            
         else:
 
             self.sigma_cavdr = self.cavdr_length
@@ -106,7 +108,9 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
                 phase=self.deg2reg(0, gen_ch=self.cavdr_ch), # 0 degrees
                 gain=self.cavdr_gain,
                 waveform="cavdr")
-        
+            
+            self.length = 4 * self.cfg.expt.length
+         
         self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma, gen_ch=self.qubit_resolved_ch)
 
         self.qubit_pulsetype = cfg['device']['soc']['qubit']['pulses']['pi_ge_resolved']['pulse_type']
@@ -136,12 +140,99 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
             print(self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain)
             print(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma)
         
+        self.sideband_ch = cfg.device.soc.sideband.ch
+        self.declare_gen(ch=self.sideband_ch, nqz=self.cfg.device.soc.sideband.nyqist)
+        self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_sigma), length=self.us2cycles(self.cfg.expt.sb_sigma) * 4)
+        self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2, k=2, flat_top_fraction=0)
+
         self.synci(200)  # give processor some time to configure pulses
         self.synci(200)  # give processor some time to configure pulses
+
+    def play_sb(self, freq= 1, length=1, gain=1, pulse_type='flat_top', ramp_type='sin_squared', ramp_sigma=1, phase=0, shift=0, stark_shift_idle_correction=False):        
+
+        if stark_shift_idle_correction:
+
+            self.add_bump_func_freq_modulation(ch=self.sideband_ch, name='sb_flat_top_bump_freq_mod', ramp_length=self.us2cycles(self.cfg.expt.sb_sigma), 
+                                            flat_top_length=self.us2cycles(length), k=2, 
+                                            freq = self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
+            
+            if pulse_type == 'flat_top':
+
+                if ramp_type == 'bump':
+                    print('Sideband flat top bump with freq. modulation')
+                    print('Freq. modulation (MHz):', self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n])
+                    self.set_pulse_registers(
+                        ch=self.sideband_ch,
+                        style="arb",
+                        freq=self.freq2reg(freq + shift - self.cfg.device.soc.sideband.fngnp1_stark_shifts[self.cfg.expt.mode][self.cfg.expt.n]),
+                        phase=self.deg2reg(phase),
+                        gain=gain,
+                        waveform="sb_flat_top_bump_freq_mod")
+                    
+        if pulse_type == 'const':
+            
+            print('Sideband const')
+            self.set_pulse_registers(
+                    ch=self.sideband_ch, 
+                    style="const", 
+                    freq=self.freq2reg(freq+shift), 
+                    phase=self.deg2reg(phase),
+                    gain=gain, 
+                    length=self.us2cycles(length))
+        
+        if pulse_type == 'flat_top':
+            
+            if ramp_type == 'sin_squared':
+                # print('Sideband flat top sin squared')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_sin_squared")
+
+            elif ramp_type == 'bump':
+                # print('Sideband flat top bump')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_bump")
+
+            elif ramp_type == 'gaussian':
+                # print('Sideband flat top gaussian')
+                self.set_pulse_registers(
+                    ch=self.sideband_ch,
+                    style="flat_top",
+                    freq=self.freq2reg(freq+shift),
+                    phase=self.deg2reg(phase),
+                    gain=gain,
+                    length=self.us2cycles(length),
+                    waveform="sb_flat_top_gaussian")
+        
+        self.pulse(ch=self.sideband_ch)
 
     def body(self):
         cfg=AttrDict(self.cfg)
 
+        sb_freq = self.cfg.device.soc.sideband.fngnp1_freqs[self.cfg.expt.mode][0] + self.cfg.expt.sb_detuning
+        sb_sigma = self.length
+        sb_gain = self.cfg.device.soc.sideband.pulses.fngnp1pi_gains[self.cfg.expt.mode][0]
+        sb_pulse_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_pulse_types[self.cfg.expt.mode]
+        sb_ramp_sigma = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_sigmas[self.cfg.expt.mode][0]
+        sb_ramp_type = self.cfg.device.soc.sideband.pulses.fngnp1pi_ramp_types[self.cfg.expt.mode]
+        print('Length of sideband (us):', self.length)
+        print('Detuning of sideband (MHz):', self.cfg.expt.sb_detuning)
+        print('Playing sideband pulse, freq = ' + str(sb_freq) + ', length = ' + str(sb_sigma) + ', gain = ' + str(sb_gain), ', ramp_sigma = ' + str(sb_ramp_sigma), ', ramp_type = ' + str(sb_ramp_type))
+
+        self.play_sb(freq=sb_freq, length=sb_sigma, gain=sb_gain, pulse_type=sb_pulse_type, ramp_type=sb_ramp_type, ramp_sigma=sb_ramp_sigma)
+        
         self.pulse(ch=self.cavdr_ch)
         self.sync_all()
         
@@ -182,7 +273,7 @@ class ResonatorSpectroscopyViaQubitProgram(RAveragerProgram):
     def update(self):
         self.mathi(self.cavdr_reg_page, self.cavdr_freq_reg, self.cavdr_freq_reg, '+', self.cavdr_freq_step) # update frequency list index
 
-class ResonatorSpectroscopyViaQubitExperiment(Experiment):
+class ResonatorSpectroscopyViaQubitStarkShiftExperiment(Experiment):
     """Qubit Spectroscopy Experiment
        Experimental Config
         expt={"start":4020, "step":0.35, "expts":300, "reps": 200,"rounds":50,
@@ -196,7 +287,7 @@ class ResonatorSpectroscopyViaQubitExperiment(Experiment):
     def acquire(self, progress=False, debug=False, data_path=None, filename=None):
         fpts=self.cfg.expt["start"] + self.cfg.expt["step"] * np.arange(self.cfg.expt["expts"])
         soc = QickConfig(self.im[self.cfg.aliases.soc].get_cfg())
-        qspec=ResonatorSpectroscopyViaQubitProgram(soc, self.cfg)
+        qspec=ResonatorSpectroscopyViaQubitStarkShiftProgram(soc, self.cfg)
         x_pts, avgi, avgq = qspec.acquire(self.im[self.cfg.aliases.soc], threshold=None,load_pulses=True,progress=progress)        
         
         data={'fpts':x_pts, 'avgi':avgi, 'avgq':avgq}

@@ -46,6 +46,9 @@ class CavityRamseyProgram(RAveragerProgram):
         self.safe_regwi(self.cavdr_reg_page, self.r_wait, self.us2cycles(cfg.expt.start))
         self.safe_regwi(self.cavdr_reg_page, self.r_phase2, 0)
         
+        self.qubit_resolved_ch = cfg.device.soc.qubit.pulses.pi_ge_resolved.ch
+        self.declare_gen(ch=self.qubit_resolved_ch, nqz=self.cfg.device.soc.qubit.nyqist)
+
         self.set_pulse_registers(
             ch=self.cavdr_ch,
             style="const",
@@ -161,33 +164,32 @@ class CavityRamseyProgram(RAveragerProgram):
         self.sync_all()
 
         # Resolved qubit pulse on 0 photon peak
-
-        self.sigma_ge = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma, gen_ch=self.q_ch)
+        self.sigma_ge_resolved = self.us2cycles(cfg.device.soc.qubit.pulses.pi_ge_resolved.sigma, gen_ch=self.qubit_resolved_ch)
 
         self.qubit_pulsetype = cfg['device']['soc']['qubit']['pulses']['pi_ge_resolved']['pulse_type']
 
         if self.qubit_pulsetype == 'gauss':
             print('Playing resolved qubit pulse')
-            self.add_gauss(ch=self.q_ch, name="qubit_ge", sigma=self.sigma_ge, length=self.sigma_ge * 4)
+            self.add_gauss(ch=self.qubit_resolved_ch, name="qubit_ge_resolved", sigma=self.sigma_ge_resolved, length=self.sigma_ge_resolved * 4)
     
             self.set_pulse_registers(
-                ch=self.q_ch,
+                ch=self.qubit_resolved_ch,
                 style="arb",
                 freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge),
                 phase=self.deg2reg(0),
                 gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain,
-                waveform="qubit_ge")
+                waveform="qubit_ge_resolved")
         
         if self.qubit_pulsetype == 'const':
             self.set_pulse_registers(
-                    ch=self.q_ch, 
+                    ch=self.qubit_resolved_ch, 
                     style="const", 
                     freq=self.freq2reg(self.cfg.device.soc.qubit.f_ge),
                     phase=0,
                     gain=self.cfg.device.soc.qubit.pulses.pi_ge_resolved.gain, 
-                    length=self.sigma_ge)
+                    length=self.sigma_ge_resolved)
             
-        self.pulse(ch=self.q_ch)
+        self.pulse(ch=self.qubit_resolved_ch)
 
         self.sync_all(self.us2cycles(0.05))  # align channels and wait 50ns
         # Readout kick pulse

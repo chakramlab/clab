@@ -61,10 +61,22 @@ class fngnp1RabiProgram(AveragerProgram):
         
         if self.pulse_type_ef == 'gauss':
             self.add_gauss(ch=self.qubit_ch, name="qubit_ef", sigma=self.sigma_ef, length=self.sigma_ef * 4)
-            
+        
+        if self.cfg.expt.ramp_flat_top_fraction:
+            self.ramp_flat_top_fraction = self.cfg.expt.ramp_flat_top_fraction
+        else:
+            self.ramp_flat_top_fraction = 0.0
+        print('Ramp flat top fraction:', self.ramp_flat_top_fraction)
+
+        if self.cfg.expt.ramp_k_offset:
+            self.ramp_k_offset = self.cfg.expt.ramp_k_offset
+        else:
+            self.ramp_k_offset = 0
+        print('Ramp k offset:', self.ramp_k_offset)
+
         self.add_gauss(ch=self.sideband_ch, name="sb_flat_top_gaussian", sigma=self.us2cycles(self.cfg.expt.sb_sigma), length=self.us2cycles(self.cfg.expt.sb_sigma) * 4)
         self.add_cosine(ch=self.sideband_ch, name="sb_flat_top_sin_squared", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2)
-        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2, k=2, flat_top_fraction=0.0)
+        self.add_bump_func(ch=self.sideband_ch, name="sb_flat_top_bump", length=self.us2cycles(self.cfg.expt.sb_sigma) * 2, k=2+self.ramp_k_offset, flat_top_fraction=self.ramp_flat_top_fraction)
         print('Sideband ramp time (us):', self.cfg.expt.sb_sigma)
         self.set_pulse_registers(
             ch=self.res_ch,
