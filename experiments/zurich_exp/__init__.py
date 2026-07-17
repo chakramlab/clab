@@ -1,5 +1,6 @@
 from .beamsplitter_spectroscopy import beamsplitter_spectroscopy
 from .bs_bangbang_with_sb_and_SB_readout import bs_bangbang_with_sb_and_SB_readout
+from .bs_rabi_loaded_memory import bs_rabi_loaded_memory
 from .bs_mode_nth import bs_mode_nth
 from .bs_mode_nth_heated import bs_mode_nth_heated
 from .bs_mode_nth_sb import bs_mode_nth_sb
