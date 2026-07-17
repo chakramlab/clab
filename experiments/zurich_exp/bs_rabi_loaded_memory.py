@@ -27,10 +27,10 @@ def bs_rabi_loaded_memory(
     bs_amplitude=None,
     reset_delay=None,
     acquisition_type=AcquisitionType.INTEGRATION,
-    buffer_spec="alice",
-    storage_spec=1,
-    buffer_rabi="bob",
-    storage_rabi=3,
+    buffer_spectator="alice",
+    storage_spectator=1,
+    buffer_target="bob",
+    storage_target=3,
     max_fock_state=1,  # only works for 1 now
     rotate_ro=False,
     thresholds=None,
@@ -47,32 +47,32 @@ def bs_rabi_loaded_memory(
     kernels = qubit_params_module.acquire_kernel
     ge_X180 = qubit_params_module.ge_X180
     ef_X180 = qubit_params_module.ef_X180
-    sb_f0g1_spec = qubit_params_module.sb_pulses[buffer_spec]["f0g1"]
-    sb_f0g1_rabi = qubit_params_module.sb_pulses[buffer_rabi]["f0g1"]
+    sb_f0g1_spectator = qubit_params_module.sb_pulses[buffer_spectator]["f0g1"]
+    sb_f0g1_target = qubit_params_module.sb_pulses[buffer_target]["f0g1"]
 
     # bs pulses
-    bs_spec = qubit_params_module.sb_pulses[buffer_spec][f"bs{storage_spec}"]
-    bs_rabi = qubit_params_module.sb_pulses[buffer_rabi][f"bs{storage_rabi}"]
+    bs_spectator = qubit_params_module.sb_pulses[buffer_spectator][f"bs{storage_spectator}"]
+    bs_target = qubit_params_module.sb_pulses[buffer_target][f"bs{storage_target}"]
 
     if bs_amplitude is not None:
-        bs_rabi.amplitude = 1
+        bs_target.amplitude = 1
 
-    bs_range_spec = qubit_parameters["q0"][f"bs_{buffer_spec}_dBm_ranges"][storage_spec]
-    bs_freq_spec = qubit_parameters["q0"][f"bs_{buffer_spec}_freqs"][storage_spec]
-    bs_range_rabi = qubit_parameters["q0"][f"bs_{buffer_rabi}_dBm_ranges"][storage_rabi]
-    bs_freq_rabi = qubit_parameters["q0"][f"bs_{buffer_rabi}_freqs"][storage_rabi]
+    bs_range_spectator = qubit_parameters["q0"][f"bs_{buffer_spectator}_dBm_ranges"][storage_spectator]
+    bs_freq_spectator = qubit_parameters["q0"][f"bs_{buffer_spectator}_freqs"][storage_spectator]
+    bs_range_target = qubit_parameters["q0"][f"bs_{buffer_target}_dBm_ranges"][storage_target]
+    bs_freq_target = qubit_parameters["q0"][f"bs_{buffer_target}_freqs"][storage_target]
 
     lo = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_range = 0.5e9
 
     requires_shift = False
-    if bs_freq_spec < lo - lo_range or bs_freq_spec > lo + lo_range:
+    if bs_freq_spectator < lo - lo_range or bs_freq_spectator > lo + lo_range:
         requires_shift = True
-    if bs_freq_rabi < lo - lo_range or bs_freq_rabi > lo + lo_range:
+    if bs_freq_target < lo - lo_range or bs_freq_target > lo + lo_range:
         requires_shift = True
 
     if requires_shift:
-        new_lo = (bs_freq_spec + bs_freq_rabi) / 2
+        new_lo = (bs_freq_spectator + bs_freq_target) / 2
         step = 200e6
         new_lo = round(new_lo / step) * step
         if new_lo < 1e9:
@@ -82,18 +82,18 @@ def bs_rabi_loaded_memory(
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
 
     if swp_amp:
-        bs_amplitude_rabi = swp_param
-        bs_length_rabi = bs_length if bs_length is not None else bs_rabi.length
+        bs_amplitude_target = swp_param
+        bs_length_target = bs_length if bs_length is not None else bs_target.length
     else:
-        bs_length_rabi = swp_param
-        bs_amplitude_rabi = bs_amplitude if bs_amplitude is not None else None
+        bs_length_target = swp_param
+        bs_amplitude_target = bs_amplitude if bs_amplitude is not None else None
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
-    sb_drive_lines_spec = {}
-    sb_drive_lines_rabi = {}
+    sb_drive_lines_spectator = {}
+    sb_drive_lines_target = {}
     for transition in transitions:
-        sb_drive_lines_spec[transition] = f"sb_drive_{buffer_spec}_{transition}"
-        sb_drive_lines_rabi[transition] = f"sb_drive_{buffer_rabi}_{transition}"
+        sb_drive_lines_spectator[transition] = f"sb_drive_{buffer_spectator}_{transition}"
+        sb_drive_lines_target[transition] = f"sb_drive_{buffer_target}_{transition}"
 
     # Create Experiment
     exp = Experiment(
@@ -101,10 +101,10 @@ def bs_rabi_loaded_memory(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("bs_spec"),
-            ExperimentSignal("bs_rabi"),
-            *[ExperimentSignal(sb_drive_lines_spec[_]) for _ in transitions],
-            *[ExperimentSignal(sb_drive_lines_rabi[_]) for _ in transitions],
+            ExperimentSignal("bs_spectator"),
+            ExperimentSignal("bs_target"),
+            *[ExperimentSignal(sb_drive_lines_spectator[_]) for _ in transitions],
+            *[ExperimentSignal(sb_drive_lines_target[_]) for _ in transitions],
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
         ],
@@ -129,58 +129,68 @@ def bs_rabi_loaded_memory(
 
             if load_spectator:
                 with exp.section(
-                    uid="sb_transition_f0g1_1",
+                    uid="sb_load_spectator",
                     play_after="ef_excitation",
                     on_system_grid=True,
                 ):
                     exp.play(
-                        signal=sb_drive_lines_spec["f0g1"],
-                        pulse=sb_f0g1_spec,
+                        signal=sb_drive_lines_spectator["f0g1"],
+                        pulse=sb_f0g1_spectator,
                     )
-                    exp.delay(signal=sb_drive_lines_spec["f0g1"], time=sb_delay)
+                    exp.delay(signal=sb_drive_lines_spectator["f0g1"], time=sb_delay)
 
                 with exp.section(
-                    uid="bs_spec_park",
-                    play_after="sb_transition_f0g1_1",
+                    uid="bs_park_spectator",
+                    play_after="sb_load_spectator",
                     on_system_grid=True,
                 ):
-                    exp.play(signal="bs_spec", pulse=bs_spec)
+                    exp.play(signal="bs_spectator", pulse=bs_spectator)
+                    
+                with exp.section(
+                    uid="ge_excitation_reprep", play_after="bs_park_spectator", on_system_grid=True
+                ):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+
+                with exp.section(
+                    uid="ef_excitation_reprep", play_after="ge_excitation_reprep", on_system_grid=True
+                ):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
             with exp.section(
-                uid="sb_transition_f0g1_2",
-                play_after="bs_spec_park" if load_spectator else "ef_excitation",
+                uid="sb_load_target",
+                play_after="ef_excitation_reprep" if load_spectator else "ef_excitation",
                 on_system_grid=True,
             ):
-                # exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                # exp.delay(signal=sb_drive_lines_target["f0g1"], time=sb_delay)
                 exp.play(
-                    signal=sb_drive_lines_rabi["f0g1"],
-                    pulse=sb_f0g1_rabi,
+                    signal=sb_drive_lines_target["f0g1"],
+                    pulse=sb_f0g1_target,
                 )
-                exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                exp.delay(signal=sb_drive_lines_target["f0g1"], time=sb_delay)
 
             with exp.section(
-                uid="bs_rabi", play_after="sb_transition_f0g1_2", on_system_grid=True
+                uid="bs_target", play_after="sb_load_target", on_system_grid=True
             ):
                 exp.play(
-                    signal="bs_rabi",
-                    pulse=bs_rabi,
-                    length=bs_length_rabi,
-                    amplitude=bs_amplitude_rabi,
+                    signal="bs_target",
+                    pulse=bs_target,
+                    length=bs_length_target,
+                    amplitude=bs_amplitude_target,
                 )
 
             with exp.section(
-                uid="sb_transition_f0g1_3", play_after="bs_rabi", on_system_grid=True
+                uid="sb_unload_target", play_after="bs_target", on_system_grid=True
             ):
-                exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                exp.delay(signal=sb_drive_lines_target["f0g1"], time=sb_delay)
                 exp.play(
-                    signal=sb_drive_lines_rabi["f0g1"],
-                    pulse=sb_f0g1_rabi,
+                    signal=sb_drive_lines_target["f0g1"],
+                    pulse=sb_f0g1_target,
                 )
-                exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                exp.delay(signal=sb_drive_lines_target["f0g1"], time=sb_delay)
 
             with exp.section(
                 uid="ef_excitation_2",
-                play_after="sb_transition_f0g1_3",
+                play_after="sb_unload_target",
                 on_system_grid=True,
             ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
@@ -213,16 +223,16 @@ def bs_rabi_loaded_memory(
     )
 
     ch = "SG4"
-    sig_freq_map[serial_num][ch]["bs_spec"] = {}
-    sig_freq_map[serial_num][ch]["bs_spec"]["frequency"] = bs_freq_spec - lo
-    sig_freq_map[serial_num][ch]["bs_spec"]["range"] = bs_range_spec
+    sig_freq_map[serial_num][ch]["bs_spectator"] = {}
+    sig_freq_map[serial_num][ch]["bs_spectator"]["frequency"] = bs_freq_spectator - lo
+    sig_freq_map[serial_num][ch]["bs_spectator"]["range"] = bs_range_spectator
 
-    sig_freq_map[serial_num][ch]["bs_rabi"] = {}
-    sig_freq_map[serial_num][ch]["bs_rabi"]["frequency"] = bs_freq_rabi - lo
-    sig_freq_map[serial_num][ch]["bs_rabi"]["range"] = bs_range_rabi
+    sig_freq_map[serial_num][ch]["bs_target"] = {}
+    sig_freq_map[serial_num][ch]["bs_target"]["frequency"] = bs_freq_target - lo
+    sig_freq_map[serial_num][ch]["bs_target"]["range"] = bs_range_target
 
-    print("bs_spec map:", sig_freq_map[serial_num][ch]["bs_spec"])
-    print("bs_rabi map:", sig_freq_map[serial_num][ch]["bs_rabi"])
+    print("bs_spectator map:", sig_freq_map[serial_num][ch]["bs_spectator"])
+    print("bs_target map:", sig_freq_map[serial_num][ch]["bs_target"])
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,
