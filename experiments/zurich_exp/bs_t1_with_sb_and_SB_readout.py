@@ -52,10 +52,14 @@ def bs_t1_with_sb_and_SB_readout(
         bs_length = bs.length
     # if bs_ramp is None:
     #     bs_ramp = qubit_params_module.sb_pulses['alice'][f'bs{storage_mode}'].pulse_parameters['ramp']
-    if bs_amplitude is None:
-        bs_amplitude = bs.amplitude
+    # if bs_amplitude is None:
+    #     bs_amplitude = bs.amplitude
+    if bs_amplitude is not None:
+        bs.amplitude=1
     if bs_range is None:
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
+    if bs_freq is None:
+        bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
 
 
 
@@ -63,9 +67,11 @@ def bs_t1_with_sb_and_SB_readout(
     lo_range = 0.5e9
     if bs_freq < lo - lo_range or bs_freq > lo + lo_range:
         old_lo = lo
-        new_lo = bs_freq
+        new_lo = bs_freq        
         step = 200e6
         new_lo = round(new_lo / step) * step
+        if new_lo < 1e9:
+            new_lo = 0
         lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
@@ -87,7 +93,7 @@ def bs_t1_with_sb_and_SB_readout(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("qb_drive_resolved"),
+            # ExperimentSignal("qb_drive_resolved"),
             ExperimentSignal("bs"),
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
@@ -117,11 +123,11 @@ def bs_t1_with_sb_and_SB_readout(
                 
             with exp.section(uid="bs", play_after="sb_transition_f0g1_1"):
                 exp.play(signal="bs", pulse=bs,
-                         length=bs_length, amplitude=bs_amplitude
+                         length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
                          )
                 exp.delay(signal="bs", time=swp_param)
                 exp.play(signal="bs", pulse=bs,
-                         length=bs_length, amplitude=bs_amplitude
+                         length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
                          )
 
             with exp.section(uid="sb_transition_f0g1_2", play_after="bs"):

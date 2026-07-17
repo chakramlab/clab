@@ -28,6 +28,8 @@ def rabi_ef(
     thresholds=None,
     pulse_type="const",  # "const" or "gaussian"
     play_ge=True,  # Whether to play the ge transition pulse
+    play_fe=False,  # Whether to play the fe transition pulse at the end
+    chunk_count=1,
 ):
 
     # Load device and config params
@@ -55,20 +57,7 @@ def rabi_ef(
             "Please select either time_rabi or amplitude_rabi to be True and the other to be False."
         )
 
-    if pulse_type == "const":
-        ef_X180_swp = pulse_library.const(
-            uid="ef_X180_pulse",
-            length=ef_X180.length,
-            amplitude=ef_X180.amplitude,
-            can_compress=True,
-        )
-    elif pulse_type == "gaussian":
-        ef_X180_swp = pulse_library.gaussian(
-            uid="ef_X180_pulse",
-            length=ef_X180.length,
-            amplitude=ef_X180.amplitude,
-            can_compress=False,
-        )
+
 
     with exp.acquire_loop_rt(
         uid="shots",
@@ -76,33 +65,45 @@ def rabi_ef(
         acquisition_type=acquisition_type,
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True
+            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True, chunk_count=chunk_count
         ):
-            with exp.section(uid="ge_transition", alignment=SectionAlignment.RIGHT):
-                exp.play(
-                    signal="qb_drive",
-                    pulse=ge_X180,
-                    amplitude=ge_X180.amplitude if play_ge else 0,
-                )
+            if play_ge:
+                with exp.section(uid="ge_transition", alignment=SectionAlignment.RIGHT):
+                    exp.play(
+                        signal="qb_drive",
+                        pulse=ge_X180,
+                    )
+                play_after = "ge_transition"
+            else:
+                play_after = None
             with exp.section(
-                uid="ef_transition", play_after="ge_transition", on_system_grid=True
+                uid="ef_transition", play_after=play_after, on_system_grid=True
             ):
                 if time_rabi:
-                    exp.play(signal="qb_ef_drive", pulse=ef_X180_swp, length=swp_param)
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180, length=swp_param)
                 elif amplitude_rabi:
                     exp.play(
-                        signal="qb_ef_drive", pulse=ef_X180_swp, amplitude=swp_param
+                        signal="qb_ef_drive", pulse=ef_X180, amplitude=swp_param
                     )
-            with exp.section(uid="eg_transition", play_after="ef_transition"):
+            with exp.section(uid="eg_transition", play_after="ef_transition", on_system_grid=True):
                 exp.play(signal="qb_drive", pulse=ge_X180)
-            with exp.section(uid="readout", play_after="eg_transition"):
+
+            if play_fe:
+                with exp.section(uid="fe_transition", play_after="eg_transition", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                play_after = "fe_transition"
+            else:
+                play_after = "eg_transition"
+
+            with exp.section(uid="readout", play_after=play_after, on_system_grid=True):
                 exp.measure(
                     measure_signal="measure",
                     measure_pulse=readout_pulse,
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay=2 * qubit_parameters["q0"]["reset_delay"],
+                    reset_delay= 2 * qubit_parameters["q0"]["reset_delay"],
+                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
     # setup calibration and signal map for the experiment

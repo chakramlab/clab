@@ -51,7 +51,9 @@ def sideband_rabi(
     kernels = None,
     rotate_ro = False,
     thresholds = None,
-    sb_freq = None
+    sb_freq = None,
+    prepare_f=True,
+    chunk_count = 1,
     ):
 
     # Load device and config params
@@ -78,9 +80,11 @@ def sideband_rabi(
             sb_drive_lines[transition] = f"sb_drive_bob_{transition}"
     if sb_length is None:
         sb_length = sb_f0g1_alice.length if alice_or_bob=="alice" else sb_f0g1_bob.length
-    if sb_amplitude is None:
-        sb_amplitude = sb_f0g1_alice.amplitude if alice_or_bob=="alice" else sb_f0g1_bob.amplitude
-        print(f'sb amplitude = {sb_amplitude}')
+    if sb_amplitude is not None:
+        if alice_or_bob=="alice":
+            sb_f0g1_alice.amplitude = 1
+        else:
+            sb_f0g1_bob.amplitude = 1
     if sb_range is None:
         sb_range = qubit_parameters["q0"][f"sb_{alice_or_bob}_dBm_range"]
     if sb_freq is None:
@@ -110,13 +114,16 @@ def sideband_rabi(
     ):
         # with exp.sweep(uid="spect_sweep", parameter = freq_swp, reset_oscillator_phase = True):
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True):
-            with exp.section(uid = "ge_excitation",  play_after=None): #alignment=SectionAlignment.RIGHT):
-                exp.play(signal = "qb_drive", pulse = ge_X180)
-            with exp.section(uid = "ef_excitation", play_after= "ge_excitation", on_system_grid=True):
-                exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True, chunk_count=chunk_count):
 
-            with exp.section(uid = "sb_transition_f0g1", play_after = "ef_excitation"):
+            if prepare_f:
+                with exp.section(uid = "ge_excitation",  play_after=None): #alignment=SectionAlignment.RIGHT):
+                    exp.play(signal = "qb_drive", pulse = ge_X180)
+
+                with exp.section(uid = "ef_excitation", play_after= "ge_excitation", on_system_grid=True):
+                    exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+
+            with exp.section(uid = "sb_transition_f0g1", play_after="ef_excitation" if prepare_f else None):
                 exp.play(signal = sb_drive_lines["f0g1"], pulse = sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob, 
                          length=sb_length, amplitude=sb_amplitude)
 

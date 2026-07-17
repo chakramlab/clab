@@ -29,7 +29,8 @@ def bs_spectroscopy_with_sb_and_SB_readout(
     max_fock_state=1,  # only works for 1 now
     rotate_ro=False,
     thresholds=None,
-    storage_mode=1
+    storage_mode=1,
+    sb_delay=0
 ):
 
     # Load device and config params
@@ -48,8 +49,10 @@ def bs_spectroscopy_with_sb_and_SB_readout(
         bs_length = bs.length
     # if bs_ramp is None:
     #     bs_ramp = qubit_params_module.sb_pulses['alice'][f'bs{storage_mode}'].pulse_parameters['ramp']
-    if bs_amplitude is None:
-        bs_amplitude = bs.amplitude
+    # if bs_amplitude is None:
+    #     bs_amplitude = bs.amplitude
+    if bs_amplitude is not None:
+        bs.amplitude=1
     if bs_range is None:
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
 
@@ -60,7 +63,9 @@ def bs_spectroscopy_with_sb_and_SB_readout(
         old_lo = lo
         new_lo = (freq_swp.start + freq_swp.stop) / 2
         step = 200e6
-        new_lo = round(new_lo / step) * step
+        new_lo = round(new_lo / step) * step        
+        if new_lo < 1e9:
+            new_lo = 0
         lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
@@ -109,11 +114,16 @@ def bs_spectroscopy_with_sb_and_SB_readout(
                     signal=sb_drive_lines["f0g1"],
                     pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
                 )
+            with exp.section(uid="sb_delay_pre", play_after="sb_transition_f0g1_1"):
+                exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
 
-            with exp.section(uid="bs", play_after="sb_transition_f0g1_1"):
-                exp.play(signal="bs", pulse=bs, length=bs_length, amplitude=bs_amplitude)
+            with exp.section(uid="bs", play_after="sb_delay_pre"):
+                exp.play(signal="bs", pulse=bs, length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None)
 
-            with exp.section(uid="sb_transition_f0g1_2", play_after="bs"):
+            with exp.section(uid="sb_delay_post", play_after="bs"):
+                exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
+
+            with exp.section(uid="sb_transition_f0g1_2", play_after="sb_delay_post"):
                 exp.play(
                     signal=sb_drive_lines["f0g1"],
                     pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,

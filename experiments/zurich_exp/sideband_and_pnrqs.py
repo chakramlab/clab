@@ -21,10 +21,11 @@ def sideband_and_pnrqs(
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
     freq_swp=LinearSweepParameter(uid="freq_swp_param", start=0e6, stop=50e6, count=11),
     acquisition_type=AcquisitionType.INTEGRATION,
-    alice_or_bob="a",
+    alice_or_bob="alice",
     rotate_ro=False,
     thresholds=None,
     max_fock_state = 1, ## only works for 1 now
+    prepare_fock_state = True
     ):
 
     # Load device and config params
@@ -77,17 +78,21 @@ def sideband_and_pnrqs(
     ):
         with exp.sweep(
             uid="spect_sweep", parameter=freq_swp, reset_oscillator_phase=True
-        ):
-            with exp.section(uid = "ge_excitation",  play_after=None): #alignment=SectionAlignment.RIGHT):
-                exp.play(signal = "qb_drive", pulse = ge_X180)
-            with exp.section(uid = "ef_excitation", play_after= "ge_excitation", on_system_grid=True):
-                exp.play(signal = "qb_ef_drive", pulse = ef_X180)
-            with exp.section(uid = "sb_transition_f0g1", play_after = "ef_excitation"):
-                exp.play(signal = sb_drive_lines["f0g1"], pulse = sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob)
-            with exp.section(uid = "fe_transition", play_after = "sb_transition_f0g1"):
-                exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+        ): 
+            if prepare_fock_state:
+                with exp.section(uid = "ge_excitation",  play_after=None): #alignment=SectionAlignment.RIGHT):
+                    exp.play(signal = "qb_drive", pulse = ge_X180)
+                with exp.section(uid = "ef_excitation", play_after= "ge_excitation", on_system_grid=True):
+                    exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+                with exp.section(uid = "sb_transition_f0g1", play_after = "ef_excitation"):
+                    exp.play(signal = sb_drive_lines["f0g1"], pulse = sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob)
+                with exp.section(uid = "fe_transition", play_after = "sb_transition_f0g1"):
+                    exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+                play_after = "fe_transition"
+            else:
+                play_after = None
 
-            with exp.section(uid="resolved_pi_ge", play_after="fe_transition", on_system_grid=True):
+            with exp.section(uid="resolved_pi_ge", play_after=play_after, on_system_grid=True):
                 exp.play(signal="qb_selective_pi_drive", pulse=resolved_X180)
             with exp.section(uid="readout", play_after="resolved_pi_ge", on_system_grid=True):
                 exp.measure(
@@ -111,7 +116,7 @@ def sideband_and_pnrqs(
     )
 
 
-    ch = "SG0"
+    ch = "SG3"
     sig_freq_map[serial_num][ch]["qb_selective_pi_drive"] = {}
     sig_freq_map[serial_num][ch]["qb_selective_pi_drive"]["frequency"] = freq_swp
     sig_freq_map[serial_num][ch]["qb_selective_pi_drive"]["range"] = qubit_parameters[

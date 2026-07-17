@@ -1,9 +1,4 @@
-from laboneq.simple import (
-    Experiment,
-    ExperimentSignal,
-    LinearSweepParameter,
-    pulse_library,
-)
+from laboneq.simple import Experiment, ExperimentSignal, LinearSweepParameter
 
 from .calib_settings import create_default_map_and_calibration
 from .laboneq_helper import default_signal_map_and_calibration
@@ -19,14 +14,16 @@ def rabi_ge(
     amplitude_rabi=False,
     time_rabi=False,
     swp_param=LinearSweepParameter(
-        uid="sweep_param", start=40e-9, stop=400e-9, count=11
+        uid="sweep_param", start=40e-9, stop=400e-9, count=11,
     ),
+    chunk_count=1,
     rotate_ro=False,
     thresholds=None,
     amplitude_factor=None,
     qubit_drive_freq=None,
     length=None,
-    resolved=False
+    resolved=False,
+    chi=False,
 ):
 
     # Load device and config params
@@ -37,11 +34,17 @@ def rabi_ge(
     kernels = qubit_params_module.acquire_kernel
     qubit_pulse = qubit_params_module.ge_X180 if not resolved else qubit_params_module.resolved_X180
 
+    # shift qb_freq by chi
+    if chi:
+        qubit_parameters["q0"]['qb_resolved_freq'] += qubit_parameters["q0"]["chi"]
+
+    qb_drive_signal = 'qb_drive_resolved' if resolved else 'qb_drive'
+
     # Create Experiment
     exp = Experiment(
         uid=exp_id,
         signals=[
-            ExperimentSignal("qb_drive"),
+            ExperimentSignal(qb_drive_signal),
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
         ],
@@ -64,13 +67,13 @@ def rabi_ge(
         count=pow(2, average_exponent),
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True
+            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True, chunk_count=chunk_count
         ):
             with exp.section(uid="qubit_excitation"):
                 if time_rabi:
-                    exp.play(signal="qb_drive", pulse=qubit_pulse, length=swp_param, amplitude=amplitude_factor)
+                    exp.play(signal=qb_drive_signal, pulse=qubit_pulse, length=swp_param, amplitude=amplitude_factor)
                 elif amplitude_rabi:
-                    exp.play(signal="qb_drive", pulse=qubit_pulse, amplitude=swp_param, length=length)
+                    exp.play(signal=qb_drive_signal, pulse=qubit_pulse, amplitude=swp_param, length=length)
             with exp.section(uid="readout", play_after="qubit_excitation"):
                 exp.measure(
                     measure_signal="measure",
@@ -92,7 +95,7 @@ def rabi_ge(
         thresholds=thresholds,
     )
     if qubit_drive_freq is not None:
-        sig_freq_map[serial_num]["SG0"]["qb_drive"]["frequency"] = qubit_drive_freq - lo_settings["q0"][serial_num]["SG0_LO"]
+        sig_freq_map[serial_num]["SG0"][qb_drive_signal]["frequency"] = qubit_drive_freq - lo_settings["q0"][serial_num]["SG0_LO"]
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

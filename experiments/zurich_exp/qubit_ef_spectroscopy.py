@@ -20,6 +20,7 @@ def qubit_ef_spectroscopy(
     freq_swp=LinearSweepParameter(
         uid="freq_swp_param", start=-150e6, stop=50e6, count=1001
     ),
+    amplitude_factor=None,
     acquisition_type=AcquisitionType.INTEGRATION,
     rotate_ro=False,
     thresholds=None,
@@ -37,6 +38,7 @@ def qubit_ef_spectroscopy(
     lo = lo_settings["q0"][serial_num]['SG0_LO']
     freq_swp.start -= lo
     freq_swp.stop -= lo
+
 
     # Create Experiment
     exp = Experiment(
@@ -62,7 +64,7 @@ def qubit_ef_spectroscopy(
             with exp.section(
                 uid="ef_transition", play_after="ge_transition", on_system_grid=True
             ):
-                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                exp.play(signal="qb_ef_drive", pulse=ef_X180, amplitude=amplitude_factor)
             with exp.section(uid="eg_transition", play_after="ef_transition"):
                 exp.play(signal="qb_drive", pulse=ge_X180)
             with exp.section(uid="readout", play_after="eg_transition"):

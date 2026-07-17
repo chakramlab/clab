@@ -2,3 +2,8 @@
 "C:\_Lib\python\clab\experiments\qm_exp\QM software\qop-server-1.30.2133.qmpkg"
 "C:\_Lib\python\clab\experiments\qm_exp\QM software\qmapp\QM Quantum Orchestration Platform.exe"
 experiments/qm_exp/QM software/qop-server-1.30.2133.qmpkg
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class

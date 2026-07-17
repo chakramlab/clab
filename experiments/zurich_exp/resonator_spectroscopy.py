@@ -15,6 +15,7 @@ def resonator_spectroscopy(
     device_setup,
     serial_num,
     qubit_params_file_path,
+    qubit_parameters=None, 
     exp_id="resonator_spectroscopy",
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
     freq_swp=LinearSweepParameter(
@@ -35,7 +36,8 @@ def resonator_spectroscopy(
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
     readout_pulse_length = qubit_params_module.readout_pulse.length
-    qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
+    if qubit_parameters is None:
+        qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
 
     lo = lo_settings["q0"][serial_num]['QA0_LO']
     freq_swp.start -= lo

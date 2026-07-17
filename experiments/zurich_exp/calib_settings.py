@@ -100,13 +100,16 @@ def create_default_map_and_calibration(
     automute=True,
     sb_SW_override=False,
     qb_drive_SW_override=False,
+    qb_resolved_SW_override=False,
 ):
 
     los = lo_settings["q0"][serial_num]
     ro_lo = los["QA0_LO"]
     qb_lo = los["SG0_LO"]
+    qb_resolved_lo = los["SG2_LO"]
     cavity_lo = los["SG2_LO"]
     sb_lo = los["SG0_LO"]
+    sb_readout_lo = los["SG2_LO"]
     bs_lo = los["SG4_LO"]
 
     spectroscopy = False
@@ -145,16 +148,16 @@ def create_default_map_and_calibration(
         sig_freq_map[serial_num][ch]["qb_drive"]["SW_override"] = qb_drive_SW_override
 
     if "qb_drive_resolved" in exp.signals:
-        ch = "SG0"
+        ch = "SG3"
         sig_freq_map[serial_num][ch]["qb_drive_resolved"] = {}
         sig_freq_map[serial_num][ch]["qb_drive_resolved"]["frequency"] = (
-            qubit_parameters["q0"]["qb_resolved_freq"] - qb_lo
+            qubit_parameters["q0"]["qb_resolved_freq"] - qb_resolved_lo
         )
         sig_freq_map[serial_num][ch]["qb_drive_resolved"]["range"] = qubit_parameters["q0"][
             "qb_drive_resolved_dBm_range"
         ]
         sig_freq_map[serial_num][ch]["qb_drive_resolved"]["automute"] = automute
-        sig_freq_map[serial_num][ch]["qb_drive_resolved"]["SW_override"] = qb_drive_SW_override
+        sig_freq_map[serial_num][ch]["qb_drive_resolved"]["SW_override"] = qb_resolved_SW_override
 
     if "qb_ef_drive" in exp.signals:
         ch = "SG0"
@@ -235,6 +238,20 @@ def create_default_map_and_calibration(
             )
             sig_freq_map[serial_num][ch][signal_name]["automute"] = automute
             sig_freq_map[serial_num][ch][signal_name]["SW_override"] = sb_SW_override
+    # sideband between transmon and readout
+    if "sb_drive_readout" in exp.signals:
+        ch = "SG3"
+        sig_freq_map[serial_num][ch]["sb_drive_readout"] = {}
+        sig_freq_map[serial_num][ch]["sb_drive_readout"]["frequency"] = (
+            qubit_parameters["q0"]["sb_readout_freqs"][0] - sb_readout_lo
+        )
+        sig_freq_map[serial_num][ch]["sb_drive_readout"]["range"] = qubit_parameters[
+            "q0"
+        ]["sb_readout_dBm_range"]
+        sig_freq_map[serial_num][ch]["sb_drive_readout"]["automute"] = automute
+        sig_freq_map[serial_num][ch]["sb_drive_readout"][
+            "SW_override"
+        ] = sb_SW_override
 
     # measure and acquire should be added to signals in pairs.
     if ("measure" in exp.signals) or ("acquire" in exp.signals):

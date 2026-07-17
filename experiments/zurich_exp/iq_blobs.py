@@ -26,12 +26,15 @@ def iq_blobs(
 
     if acquire_delay is not None:
         assert acquire_delay <= readout_pulse.length, "Acquire delay exceeds readout pulse length"
+    else:
+        acquire_delay = qubit_parameters['q0']['acquire_delay']
 
     # Create Experiment
     exp = Experiment(
         uid=exp_id,
         signals=[
             ExperimentSignal("qb_drive"),
+            ExperimentSignal("qb_ef_drive"),
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
         ],
@@ -56,10 +59,10 @@ def iq_blobs(
                 reset_delay=qubit_parameters["q0"]["reset_delay"],
             )
 
-        with exp.section(uid="qubit_ge_excitation", play_after="readout_g"):
+        with exp.section(uid="qubit_ge_excitation_0", play_after="readout_g"):
             exp.play(signal="qb_drive", pulse=ge_X180)
 
-        with exp.section(uid="readout_e", play_after="qubit_ge_excitation"):
+        with exp.section(uid="readout_e", play_after="qubit_ge_excitation_0"):
             exp.measure(
                 measure_signal="measure",
                 measure_pulse=readout_pulse,
@@ -72,9 +75,11 @@ def iq_blobs(
             )
 
         if measure_f:
+            with exp.section(uid="qubit_ge_excitation_1", play_after="readout_e"):
+                exp.play(signal="qb_drive", pulse=ge_X180)
 
-            with exp.section(uid="qubit_ef_excitation", play_after="readout_e"):
-                exp.play(signal="qb_drive", pulse=ef_X180)
+            with exp.section(uid="qubit_ef_excitation", play_after="qubit_ge_excitation_1", on_system_grid=True):
+                exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
             with exp.section(uid="readout_f", play_after="qubit_ef_excitation"):
                 exp.measure(
@@ -82,8 +87,10 @@ def iq_blobs(
                     measure_pulse=readout_pulse,
                     acquire_signal="acquire",
                     integration_kernel=kernels,
+                    acquire_delay=acquire_delay,
+                    integration_length=readout_pulse.length-acquire_delay if acquire_delay is not None else readout_pulse.length,
                     handle="ac_2",
-                    reset_delay=qubit_parameters["q0"]["reset_delay"],
+                    reset_delay=qubit_parameters["q0"]["reset_delay"]*2,
                 )
 
     # setup calibration and signal map for the experiment

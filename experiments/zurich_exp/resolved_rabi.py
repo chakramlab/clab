@@ -65,9 +65,6 @@ def resolved_rabi(
     if amplitude is None:
         amplitude = resolved_X180.amplitude
 
-
-    
-
     with exp.acquire_loop_rt(
         uid="shots",
         count=pow(2, average_exponent),

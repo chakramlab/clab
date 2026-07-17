@@ -27,13 +27,15 @@ def bs_rabi_with_sb_and_SB_readout(
     bs_range=None,
     bs_length=None,
     bs_amplitude=None,
+    reset_delay=None,
     acquisition_type=AcquisitionType.INTEGRATION,
     alice_or_bob="alice",
     max_fock_state=1,  # only works for 1 now
     rotate_ro=False,
     thresholds=None,
     swp_amp=False,
-    storage_mode=1
+    storage_mode=1,
+    sb_delay=0
     ):
 
     # Load device and config params
@@ -53,10 +55,14 @@ def bs_rabi_with_sb_and_SB_readout(
         bs_length = bs.length
     # if bs_ramp is None:
     #     bs_ramp = qubit_params_module.sb_pulses['alice'][f'bs{storage_mode}'].pulse_parameters['ramp']
-    if bs_amplitude is None:
-        bs_amplitude = bs.amplitude
+    # if bs_amplitude is None:
+    #     bs_amplitude = bs.amplitude
+    if bs_amplitude is not None:
+        bs.amplitude=1
     if bs_range is None:
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
+    if bs_freq is None:
+        bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
 
 
 
@@ -67,6 +73,8 @@ def bs_rabi_with_sb_and_SB_readout(
         new_lo = bs_freq
         step = 200e6
         new_lo = round(new_lo / step) * step
+        if new_lo < 1e9:
+            new_lo = 0
         lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
@@ -93,7 +101,6 @@ def bs_rabi_with_sb_and_SB_readout(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("qb_drive_resolved"),
             ExperimentSignal("bs"),
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
@@ -110,22 +117,24 @@ def bs_rabi_with_sb_and_SB_readout(
             uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True,
             ):
 
-            with exp.section(uid = "ge_excitation",  play_after=None):
+            with exp.section(uid = "ge_excitation",  play_after=None, on_system_grid=True):
                 exp.play(signal = "qb_drive", pulse = ge_X180)
 
             with exp.section(uid = "ef_excitation", play_after= "ge_excitation", on_system_grid=True):
                 exp.play(signal = "qb_ef_drive", pulse = ef_X180)
 
-            with exp.section(uid = "sb_transition_f0g1_1", play_after = "ef_excitation"):
+            with exp.section(uid = "sb_transition_f0g1_1", play_after = "ef_excitation", on_system_grid=True):
                 exp.play(signal = sb_drive_lines["f0g1"], 
                          pulse = sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob, 
                 )
-            with exp.section(uid="bs", play_after="sb_transition_f0g1_1"):
+                exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
+            with exp.section(uid="bs", play_after="sb_transition_f0g1_1", on_system_grid=True):
                 exp.play(signal="bs", pulse=bs,
-                         length=bs_length, amplitude=bs_amplitude
+                         length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
                          )
 
-            with exp.section(uid="sb_transition_f0g1_2", play_after="bs"):
+            with exp.section(uid="sb_transition_f0g1_2", play_after="bs", on_system_grid=True):
+                exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
                 exp.play(
                     signal=sb_drive_lines["f0g1"],
                     pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
@@ -137,14 +146,14 @@ def bs_rabi_with_sb_and_SB_readout(
             ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
-            with exp.section(uid="readout", play_after="ef_excitation_2"):
+            with exp.section(uid="readout", play_after="ef_excitation_2", on_system_grid=True):
                 exp.measure(
                     measure_signal="measure",
                     measure_pulse=readout_pulse,
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 

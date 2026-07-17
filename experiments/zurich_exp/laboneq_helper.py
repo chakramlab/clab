@@ -109,6 +109,7 @@ def save_data(data_path, file_name, data, config=None):
             f.attrs["config"] = json.dumps(config)
     print("File saved at", file_path)
 
+
 def save_calibrated_data(data_path, file_name, data, config=None):
     file_path = os.path.join(data_path, get_next_filename(data_path, file_name, "h5"))
     with h5py.File(file_path, "w") as f:
@@ -140,10 +141,14 @@ def save_calibrated_data(data_path, file_name, data, config=None):
             ypts = data.get("ypts", None)
             if ypts is not None:
                 f.create_dataset("ypts", data=ypts)
-       
+        if "zpts" in data:
+            zpts = data.get("zpts", None)
+            if zpts is not None:
+                f.create_dataset("zpts", data=zpts)
+
         if config:
             f.attrs["config"] = json.dumps(config)
-    
+
     print("File saved at", file_path)
 
 

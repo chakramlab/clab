@@ -87,7 +87,6 @@ def sideband_spectroscopy(
         sb_length = sb_f0g1_alice.length if alice_or_bob=="alice" else sb_f0g1_bob.length
     if sb_amplitude is None:
         sb_amplitude = sb_f0g1_alice.amplitude if alice_or_bob=="alice" else sb_f0g1_bob.amplitude
-        print(f'sb amplitude = {sb_amplitude}')
     if sb_range is None:
         sb_range = qubit_parameters["q0"][f"sb_{alice_or_bob}_dBm_range"]
 

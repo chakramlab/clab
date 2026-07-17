@@ -61,7 +61,7 @@ def cavity_t1_with_sb(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("qb_drive_resolved"),
+            # ExperimentSignal("qb_drive_resolved"),
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
@@ -87,11 +87,14 @@ def cavity_t1_with_sb(
                 exp.play(signal = sb_drive_lines["f0g1"], 
                          pulse = sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob, 
                 )
-                exp.delay(signal=sb_drive_lines["f0g1"], time=swp_param)            
+
+                exp.delay(signal=sb_drive_lines["f0g1"], time=swp_param)       
+
                 exp.play(
                     signal=sb_drive_lines["f0g1"],
                     pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
                 )
+                
             with exp.section(
                 uid="ef_excitation_2",
                 play_after="sb_transition_f0g1",

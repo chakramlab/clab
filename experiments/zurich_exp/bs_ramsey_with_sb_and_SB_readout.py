@@ -35,6 +35,8 @@ def bs_ramsey_with_sb_and_SB_readout(
     storage_mode=1,
     echo=False,
     sw_detuning_freq=0,
+    reset_delay=None,
+    chunk_count=None,
     ):
 
     # Load device and config params
@@ -54,10 +56,14 @@ def bs_ramsey_with_sb_and_SB_readout(
         bs_length = bs.length
     # if bs_ramp is None:
     #     bs_ramp = qubit_params_module.sb_pulses['alice'][f'bs{storage_mode}'].pulse_parameters['ramp']
-    if bs_amplitude is None:
-        bs_amplitude = bs.amplitude
+    # if bs_amplitude is None:
+    #     bs_amplitude = bs.amplitude
+    if bs_amplitude is not None:
+        bs.amplitude = 1
     if bs_range is None:
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
+    if bs_freq is None:
+        bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
 
 
 
@@ -94,7 +100,7 @@ def bs_ramsey_with_sb_and_SB_readout(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("qb_drive_resolved"),
+            # ExperimentSignal("qb_drive_resolved"),
             ExperimentSignal("bs"),
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
@@ -113,7 +119,7 @@ def bs_ramsey_with_sb_and_SB_readout(
         ):
 
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True,
+            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True, chunk_count=chunk_count
             ):
 
             with exp.section(uid = "ge_excitation",  play_after=None):
@@ -128,11 +134,11 @@ def bs_ramsey_with_sb_and_SB_readout(
                 )
             with exp.section(uid="bs", play_after="sb_transition_f0g1_1"):
                 exp.play(signal="bs", pulse=bs,
-                         length=bs_length, amplitude=bs_amplitude
+                         length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
                          )
                 exp.delay(signal="bs", time=swp_param if echo else swp_param[0])
                 exp.play(signal="bs", pulse=bs,
-                         length=bs_length, amplitude=bs_amplitude
+                         length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
                          )
             with exp.section(uid="sb_transition_f0g1_2", play_after="bs"):
                 exp.play(
@@ -153,7 +159,7 @@ def bs_ramsey_with_sb_and_SB_readout(
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
