@@ -1,0 +1,8 @@
+{
+    "python-envs.pythonProjects": [],
+    "python.analysis.extraPaths": [
+        "C:\\_Lib\\python",
+        "C:\\_Lib\\python\\slab",
+        "C:\\_Lib\\python\\clab"
+    ]
+}
