@@ -33,9 +33,8 @@ def bs_ramsey_echo(
     thresholds=None,
     swp_amp=False,
     storage_mode=1,
-    echo=False,  # Kept for backwards compatibility
-    n_echoes=1,  # Number of CPMG echoes
-    echo_axis="X", # "X" or "Y" for the pi pulse phase
+    n_echoes=0,  # Number of CPMG echoes
+    echo_axis="X",  # "X" or "Y" for the pi pulse phase
     sw_detuning_freq=0,
     reset_delay=None,
     chunk_count=None,
@@ -51,10 +50,10 @@ def bs_ramsey_echo(
     ge_X180 = qubit_params_module.ge_X180
     ef_X180 = qubit_params_module.ef_X180
     sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
-    sb_f0g1_bob   = qubit_params_module.sb_pulses["bob"]["f0g1"]
+    sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
 
     # bs pulse
-    bs = qubit_params_module.sb_pulses[alice_or_bob][f'bs{storage_mode}']
+    bs = qubit_params_module.sb_pulses[alice_or_bob][f"bs{storage_mode}"]
     if bs_length is None:
         bs_length = bs.length
     if bs_amplitude is not None:
@@ -74,7 +73,7 @@ def bs_ramsey_echo(
         lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
-        lo_change=True
+        lo_change = True
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
@@ -100,37 +99,42 @@ def bs_ramsey_echo(
 
     # set up phase sweep
     phase_swp = 2 * np.pi * time_swp * sw_detuning_freq
-    swp_param = time_swp if echo else [time_swp, phase_swp]
-    
+    swp_param = [time_swp, phase_swp]
+
     # CPMG delays
     if n_echoes > 0:
-        tau_half = time_swp / (2 * n_echoes)
-        tau_full = time_swp / n_echoes
+        tau_half = time_swp.values / (2 * n_echoes)
+        tau_full = time_swp.values / n_echoes
 
     with exp.acquire_loop_rt(
-        uid="shots", 
-        count=pow(2, average_exponent), 
-        acquisition_type=acquisition_type
+        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True, chunk_count=chunk_count
+            uid="time_or_amp_sweep",
+            parameter=swp_param,
+            reset_oscillator_phase=True,
+            chunk_count=chunk_count,
         ):
             with exp.section(uid="ge_excitation", play_after=None):
                 exp.play(signal="qb_drive", pulse=ge_X90)
 
-            with exp.section(uid="ef_excitation", play_after="ge_excitation", on_system_grid=True):
+            with exp.section(
+                uid="ef_excitation", play_after="ge_excitation", on_system_grid=True
+            ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
             with exp.section(uid="sb_load_buffer", play_after="ef_excitation"):
                 exp.play(
-                    signal=sb_drive_lines["f0g1"], 
-                    pulse=sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob, 
+                    signal=sb_drive_lines["f0g1"],
+                    pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
                 )
-                
+
             with exp.section(uid="bs_load_storage", play_after="sb_load_buffer"):
                 exp.play(
-                    signal="bs", pulse=bs,
-                    length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
+                    signal="bs",
+                    pulse=bs,
+                    length=bs_length,
+                    amplitude=bs_amplitude if bs_amplitude is not None else None,
                 )
 
             last_uid = "bs_load_storage"
@@ -142,33 +146,78 @@ def bs_ramsey_echo(
             else:
                 for i in range(n_echoes):
                     delay_time = tau_half if i == 0 else tau_full
-                    
+
                     with exp.section(uid=f"echo_{i}_delay_pre", play_after=last_uid):
                         exp.delay(signal="bs", time=delay_time)
 
-                    with exp.section(uid=f"echo_{i}_unload_storage", play_after=f"echo_{i}_delay_pre"):
-                        exp.play(signal="bs", pulse=bs, length=bs_length, amplitude=bs_amplitude)
+                    with exp.section(
+                        uid=f"echo_{i}_unload_storage", play_after=f"echo_{i}_delay_pre"
+                    ):
+                        exp.play(
+                            signal="bs",
+                            pulse=bs,
+                            length=bs_length,
+                            amplitude=bs_amplitude,
+                        )
 
-                    with exp.section(uid=f"echo_{i}_unload_buffer", play_after=f"echo_{i}_unload_storage"):
-                        exp.play(signal=sb_drive_lines["f0g1"], pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob)
+                    with exp.section(
+                        uid=f"echo_{i}_unload_buffer",
+                        play_after=f"echo_{i}_unload_storage",
+                    ):
+                        exp.play(
+                            signal=sb_drive_lines["f0g1"],
+                            pulse=(
+                                sb_f0g1_alice
+                                if alice_or_bob == "alice"
+                                else sb_f0g1_bob
+                            ),
+                        )
 
-                    with exp.section(uid=f"echo_{i}_ef_down", play_after=f"echo_{i}_unload_buffer", on_system_grid=True):
+                    with exp.section(
+                        uid=f"echo_{i}_ef_down",
+                        play_after=f"echo_{i}_unload_buffer",
+                        on_system_grid=True,
+                    ):
                         exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
                     # PI PULSE
                     phase = np.pi / 2 if echo_axis.upper() == "Y" else 0
-                    with exp.section(uid=f"echo_{i}_ge_pi", play_after=f"echo_{i}_ef_down", on_system_grid=True):
+                    with exp.section(
+                        uid=f"echo_{i}_ge_pi",
+                        play_after=f"echo_{i}_ef_down",
+                        on_system_grid=True,
+                    ):
                         exp.play(signal="qb_drive", pulse=ge_X180, phase=phase)
 
-                    with exp.section(uid=f"echo_{i}_ef_up", play_after=f"echo_{i}_ge_pi", on_system_grid=True):
+                    with exp.section(
+                        uid=f"echo_{i}_ef_up",
+                        play_after=f"echo_{i}_ge_pi",
+                        on_system_grid=True,
+                    ):
                         exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
-                    with exp.section(uid=f"echo_{i}_load_buffer", play_after=f"echo_{i}_ef_up"):
-                        exp.play(signal=sb_drive_lines["f0g1"], pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob)
+                    with exp.section(
+                        uid=f"echo_{i}_load_buffer", play_after=f"echo_{i}_ef_up"
+                    ):
+                        exp.play(
+                            signal=sb_drive_lines["f0g1"],
+                            pulse=(
+                                sb_f0g1_alice
+                                if alice_or_bob == "alice"
+                                else sb_f0g1_bob
+                            ),
+                        )
 
-                    with exp.section(uid=f"echo_{i}_load_storage", play_after=f"echo_{i}_load_buffer"):
-                        exp.play(signal="bs", pulse=bs, length=bs_length, amplitude=bs_amplitude)
-                    
+                    with exp.section(
+                        uid=f"echo_{i}_load_storage", play_after=f"echo_{i}_load_buffer"
+                    ):
+                        exp.play(
+                            signal="bs",
+                            pulse=bs,
+                            length=bs_length,
+                            amplitude=bs_amplitude,
+                        )
+
                     last_uid = f"echo_{i}_load_storage"
 
                 # Final tau/2 delay
@@ -179,22 +228,26 @@ def bs_ramsey_echo(
             # Final Unload & Readout
             with exp.section(uid="bs_unload_storage", play_after=last_uid):
                 exp.play(
-                    signal="bs", pulse=bs,
-                    length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None
+                    signal="bs",
+                    pulse=bs,
+                    length=bs_length,
+                    amplitude=bs_amplitude if bs_amplitude is not None else None,
                 )
-                
+
             with exp.section(uid="sb_unload_buffer", play_after="bs_unload_storage"):
                 exp.play(
                     signal=sb_drive_lines["f0g1"],
                     pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
                 )
-                
-            with exp.section(uid="ef_deexcitation", play_after="sb_unload_buffer", on_system_grid=True):
+
+            with exp.section(
+                uid="ef_deexcitation",
+                play_after="sb_unload_buffer",
+                on_system_grid=True,
+            ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
-                
+
             with exp.section(uid="ge_deexcitation", play_after="ef_deexcitation"):
-                # If there's an odd number of echoes, the state parity is flipped, 
-                # but the user manages the phase/sweep logic so we keep their original ge_X90 closing pulse.
                 exp.play(signal="qb_drive", pulse=ge_X90, phase=phase_swp)
 
             with exp.section(uid="readout", play_after="ge_deexcitation"):
@@ -204,7 +257,11 @@ def bs_ramsey_echo(
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
+                    reset_delay=(
+                        qubit_parameters["q0"]["cavity_reset_delay"]
+                        if reset_delay is None
+                        else reset_delay
+                    ),
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 

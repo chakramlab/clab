@@ -15,7 +15,7 @@ def bs_spectroscopy_loaded_memory(
     device_setup,
     serial_num,
     qubit_params_file_path,
-    exp_id="bs_spectroscopy_loaded_memory",
+    exp_id="loaded_memory_bs_spectroscopy",
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
     freq_swp=LinearSweepParameter(
         uid="freq_swp_param", start=-700e6, stop=700e6, count=6
@@ -44,12 +44,14 @@ def bs_spectroscopy_loaded_memory(
     kernels = qubit_params_module.acquire_kernel
     ge_X180 = qubit_params_module.ge_X180
     ef_X180 = qubit_params_module.ef_X180
-    
+
     sb_f0g1_spectator = qubit_params_module.sb_pulses[buffer_spectator]["f0g1"]
     sb_f0g1_target = qubit_params_module.sb_pulses[buffer_target]["f0g1"]
 
     # bs pulses
-    bs_spectator = qubit_params_module.sb_pulses[buffer_spectator][f"bs{storage_spectator}"]
+    bs_spectator = qubit_params_module.sb_pulses[buffer_spectator][
+        f"bs{storage_spectator}"
+    ]
     bs_target = qubit_params_module.sb_pulses[buffer_target][f"bs{storage_target}"]
 
     if bs_length is None:
@@ -57,10 +59,16 @@ def bs_spectroscopy_loaded_memory(
     if bs_amplitude is not None:
         bs_target.amplitude = 1
     if bs_range is None:
-        bs_range = qubit_parameters["q0"][f"bs_{buffer_target}_dBm_ranges"][storage_target]
+        bs_range = qubit_parameters["q0"][f"bs_{buffer_target}_dBm_ranges"][
+            storage_target
+        ]
 
-    bs_range_spectator = qubit_parameters["q0"][f"bs_{buffer_spectator}_dBm_ranges"][storage_spectator]
-    bs_freq_spectator = qubit_parameters["q0"][f"bs_{buffer_spectator}_freqs"][storage_spectator]
+    bs_range_spectator = qubit_parameters["q0"][f"bs_{buffer_spectator}_dBm_ranges"][
+        storage_spectator
+    ]
+    bs_freq_spectator = qubit_parameters["q0"][f"bs_{buffer_spectator}_freqs"][
+        storage_spectator
+    ]
 
     lo = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_range = 0.5e9
@@ -80,7 +88,7 @@ def bs_spectroscopy_loaded_memory(
         lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
-        
+
     freq_swp.start -= lo
     freq_swp.stop -= lo
 
@@ -88,7 +96,9 @@ def bs_spectroscopy_loaded_memory(
     sb_drive_lines_spectator = {}
     sb_drive_lines_target = {}
     for transition in transitions:
-        sb_drive_lines_spectator[transition] = f"sb_drive_{buffer_spectator}_{transition}"
+        sb_drive_lines_spectator[transition] = (
+            f"sb_drive_{buffer_spectator}_{transition}"
+        )
         sb_drive_lines_target[transition] = f"sb_drive_{buffer_target}_{transition}"
 
     # Create Experiment
@@ -137,21 +147,26 @@ def bs_spectroscopy_loaded_memory(
                     on_system_grid=True,
                 ):
                     exp.play(signal="bs_spectator", pulse=bs_spectator)
-                    
+
                 with exp.section(
-                    uid="ge_excitation_reprep", play_after="bs_park_spectator", on_system_grid=True
+                    uid="ge_excitation_reprep",
+                    play_after="bs_park_spectator",
+                    on_system_grid=True,
                 ):
                     exp.play(signal="qb_drive", pulse=ge_X180)
 
                 with exp.section(
-                    uid="ef_excitation_reprep", play_after="ge_excitation_reprep", on_system_grid=True
+                    uid="ef_excitation_reprep",
+                    play_after="ge_excitation_reprep",
+                    on_system_grid=True,
                 ):
                     exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
-
             with exp.section(
                 uid="sb_load_target",
-                play_after="ef_excitation_reprep" if load_spectator else "ef_excitation",
+                play_after=(
+                    "ef_excitation_reprep" if load_spectator else "ef_excitation"
+                ),
                 on_system_grid=True,
             ):
                 exp.play(
@@ -160,15 +175,19 @@ def bs_spectroscopy_loaded_memory(
                 )
                 exp.delay(signal=sb_drive_lines_target["f0g1"], time=sb_delay)
 
-            with exp.section(uid="bs_target", play_after="sb_load_target", on_system_grid=True):
+            with exp.section(
+                uid="bs_target", play_after="sb_load_target", on_system_grid=True
+            ):
                 exp.play(
-                    signal="bs_target", 
-                    pulse=bs_target, 
-                    length=bs_length, 
-                    amplitude=bs_amplitude if bs_amplitude is not None else None
+                    signal="bs_target",
+                    pulse=bs_target,
+                    length=bs_length,
+                    amplitude=bs_amplitude if bs_amplitude is not None else None,
                 )
 
-            with exp.section(uid="sb_unload_target", play_after="bs_target", on_system_grid=True):
+            with exp.section(
+                uid="sb_unload_target", play_after="bs_target", on_system_grid=True
+            ):
                 exp.delay(signal=sb_drive_lines_target["f0g1"], time=sb_delay)
                 exp.play(
                     signal=sb_drive_lines_target["f0g1"],
@@ -183,7 +202,9 @@ def bs_spectroscopy_loaded_memory(
             ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
-            with exp.section(uid="readout", play_after="ef_excitation_2", on_system_grid=True):
+            with exp.section(
+                uid="readout", play_after="ef_excitation_2", on_system_grid=True
+            ):
                 exp.measure(
                     measure_signal="measure",
                     measure_pulse=readout_pulse,
