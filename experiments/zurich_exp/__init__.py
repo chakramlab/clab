@@ -5,6 +5,8 @@ from .bs_mode_nth_heated import bs_mode_nth_heated
 from .bs_mode_nth_sb import bs_mode_nth_sb
 from .bs_rabi_loaded_memory import bs_rabi_loaded_memory
 from .bs_rabi_new_test import bs_rabi_new_test
+from .bs_rabi_post_selected_1buffer import bs_rabi_post_selected_1buffer
+from .bs_rabi_post_selected_2buffer import bs_rabi_post_selected_2buffer
 from .bs_rabi_test import bs_rabi_test
 from .bs_rabi_transmon_storage import bs_rabi_transmon_storage
 from .bs_rabi_with_sb import bs_rabi_with_sb
