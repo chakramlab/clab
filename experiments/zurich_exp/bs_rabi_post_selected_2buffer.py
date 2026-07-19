@@ -1,5 +1,6 @@
 from laboneq.simple import (
     AcquisitionType,
+    AveragingMode,
     Experiment,
     ExperimentSignal,
     LinearSweepParameter,
@@ -36,7 +37,8 @@ def bs_rabi_post_selected_2buffer(
     thresholds=None,
     swp_amp=False,
     storage_mode=1,
-    sb_delay=0
+    sb_delay=0,
+    averaging_mode=AveragingMode.CYCLIC
 ):
 
     # Load device and config params
@@ -121,7 +123,7 @@ def bs_rabi_post_selected_2buffer(
         ],
     )
     with exp.acquire_loop_rt(
-        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
+        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type, averaging_mode=averaging_mode
     ):
         with exp.sweep(
             uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True,
