@@ -1,4 +1,10 @@
-from laboneq.simple import AcquisitionType, AveragingMode, Experiment, ExperimentSignal
+from laboneq.simple import (
+    AcquisitionType,
+    AveragingMode,
+    Experiment,
+    ExperimentSignal,
+    pulse_library,
+)
 
 from .calib_settings import create_default_map_and_calibration
 from .laboneq_helper import default_signal_map_and_calibration
@@ -11,6 +17,8 @@ def iq_blobs(
     qubit_params_file_path,
     exp_id="iq_blobs",
     average_exponent=12,
+    frequency=None,
+    amplitude=None,
     acquire_delay=None,
     measure_f=False,
 ):
@@ -24,10 +32,19 @@ def iq_blobs(
     ge_X180 = qubit_params_module.ge_X180
     ef_X180 = qubit_params_module.ef_X180
 
+    if frequency is not None:
+        lo = lo_settings["q0"][serial_num]['QA0_LO']
+        frequency -= lo
+
     if acquire_delay is not None:
         assert acquire_delay <= readout_pulse.length, "Acquire delay exceeds readout pulse length"
     else:
         acquire_delay = qubit_parameters['q0']['acquire_delay']
+
+    if amplitude is not None:
+        readout_pulse_length = qubit_params_module.readout_pulse.length
+        readout_pulse = pulse_library.const(
+        uid="ro_pulse", length=readout_pulse_length, amplitude=1.0)
 
     # Create Experiment
     exp = Experiment(
@@ -51,6 +68,7 @@ def iq_blobs(
             exp.measure(
                 measure_signal="measure",
                 measure_pulse=readout_pulse,
+                measure_pulse_amplitude=amplitude,
                 acquire_signal="acquire",
                 integration_kernel=kernels,
                 acquire_delay=acquire_delay,
@@ -66,6 +84,7 @@ def iq_blobs(
             exp.measure(
                 measure_signal="measure",
                 measure_pulse=readout_pulse,
+                measure_pulse_amplitude=amplitude,
                 acquire_signal="acquire",
                 integration_kernel=kernels,
                 acquire_delay=acquire_delay,
@@ -85,6 +104,7 @@ def iq_blobs(
                 exp.measure(
                     measure_signal="measure",
                     measure_pulse=readout_pulse,
+                    measure_pulse_amplitude=amplitude,
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     acquire_delay=acquire_delay,
@@ -97,6 +117,9 @@ def iq_blobs(
     sig_freq_map = create_default_map_and_calibration(
         exp, serial_num, qubit_parameters, lo_settings
     )
+
+    sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"] = frequency if frequency is not None else sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"]
+
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,
         {

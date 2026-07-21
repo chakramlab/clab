@@ -20,7 +20,7 @@ def bs_rabi_post_selected_1buffer(
     serial_num,
     qubit_params_file_path,
     exp_id="bs_rabi_post_selected_1buffer",
-    average_exponent=5,
+    shots=1500,
     swp_param=LinearSweepParameter(
         uid="swp_param", start=1e-9, stop=10e-6, count=6
     ),
@@ -103,7 +103,7 @@ def bs_rabi_post_selected_1buffer(
         ],
     )
     with exp.acquire_loop_rt(
-        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type, averaging_mode=averaging_mode
+        uid="shots", count=shots, acquisition_type=acquisition_type, averaging_mode=averaging_mode
     ):
         with exp.sweep(
             uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True,

@@ -65,13 +65,13 @@ def iq_blobs_2d(
     )
 
     with exp.sweep(uid='amp_sweep', parameter=amp_swp):
-        with exp.sweep(uid="freq_sweep", parameter=freq_swp):
-            with exp.acquire_loop_rt(
-                uid="shots",
-                count=count,
-                acquisition_type=AcquisitionType.SPECTROSCOPY,
-                averaging_mode=AveragingMode.SINGLE_SHOT,
-            ):   
+        with exp.acquire_loop_rt(
+            uid="shots",
+            count=count,
+            acquisition_type=AcquisitionType.SPECTROSCOPY,
+            averaging_mode=AveragingMode.SINGLE_SHOT,
+        ):
+            with exp.sweep(uid="freq_sweep", parameter=freq_swp):
                 with exp.section(uid="readout_g"):
                     exp.measure(
                         measure_signal="measure",

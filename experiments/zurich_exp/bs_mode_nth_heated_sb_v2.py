@@ -11,24 +11,30 @@ from .laboneq_helper import default_signal_map_and_calibration
 from .load_qubit_params import load_qubit_params
 
 
-def bs_mode_nth_sb(
+def bs_mode_nth_heated_sb_v2(
     device_setup,
     serial_num,
     qubit_params_file_path,
-    exp_id="bs_mode_nth_sb",
+    exp_id="bs_mode_nth_heated_sb_v2",
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
+    swp_param_off_resonant=LinearSweepParameter(
+        uid="swp_param_off_resonant", start=1e-9, stop=10e-6, count=6
+    ),
     swp_param=LinearSweepParameter(uid="swp_param", start=1e-9, stop=10e-6, count=6),
     prepare_f=True,
+    bs_freq_off_resonant=None,
     bs_freq=None,
     bs_range=None,
     bs_length=None,
     bs_amplitude=None,
+    bs_heating_amplitude=None,
     acquisition_type=AcquisitionType.INTEGRATION,
     alice_or_bob="alice",
     max_fock_state=1,
     rotate_ro=False,
     thresholds=None,
     storage_mode=0,
+    chunk_count=None,
 ):
 
     # Load device and config params
@@ -42,20 +48,23 @@ def bs_mode_nth_sb(
     sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
     sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
 
-    # bs pulse (actual resonant one)
+    # bs pulse (actual resonant one). The off-resonant heating pulse reuses the
+    # same envelope, played on its own signal at bs_freq_off_resonant.
     bs = qubit_params_module.sb_pulses[alice_or_bob][f"bs{storage_mode}"]
     if bs_length is None:
         bs_length = bs.length
-    # if bs_ramp is None:
-    #     bs_ramp = qubit_params_module.sb_pulses['alice'][f'bs{storage_mode}'].pulse_parameters['ramp']
-    # if bs_amplitude is None:
-    #     bs_amplitude = bs.amplitude
     if bs_amplitude is not None:
         bs.amplitude = 1
     if bs_range is None:
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
     if bs_freq is None:
         bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
+    if bs_heating_amplitude is None:
+        bs_heating_amplitude = bs_amplitude
+    if bs_freq_off_resonant is None:
+        raise ValueError(
+            "Please provide bs_freq_off_resonant (frequency of the heating drive)."
+        )
 
     lo = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_range = 0.5e9
@@ -68,17 +77,20 @@ def bs_mode_nth_sb(
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
         lo_change = True
+    if bs_freq_off_resonant < lo - lo_range or bs_freq_off_resonant > lo + lo_range:
+        print(
+            f"WARNING: Frequency for off-resonant BS pulse {bs_freq_off_resonant/1e9} GHz is out of range of LO {lo/1e9} GHz +/- {lo_range/1e9} GHz"
+        )
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
-    sb_drive_pulses = {}
     for transition in transitions:
         if alice_or_bob == "alice":
             sb_drive_lines[transition] = f"sb_drive_alice_{transition}"
         else:
             sb_drive_lines[transition] = f"sb_drive_bob_{transition}"
 
-    # Create Experiment - using single "bs" signal for both pulses with frequency switching
+    # Create Experiment - separate "bs_off_resonant" (heating) and "bs" (swap) signals
     exp = Experiment(
         uid=exp_id,
         signals=[
@@ -95,75 +107,93 @@ def bs_mode_nth_sb(
         uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep",
-            parameter=swp_param,
+            uid="time_or_amp_sweep_off_resonant",
+            parameter=swp_param_off_resonant,
             reset_oscillator_phase=True,
+            chunk_count=chunk_count,
         ):
 
-            with exp.section(
+            with exp.sweep(
+                uid="time_or_amp_sweep",
+                parameter=swp_param,
+                reset_oscillator_phase=True,
+            ):
+
+                with exp.section(
                     uid="bs_off_resonant", play_after=None, on_system_grid=True
                 ):
                     exp.play(
                         signal="bs_off_resonant",
                         pulse=bs,
                         length=swp_param_off_resonant,
-                        amplitude=bs_amplitude,
+                        amplitude=(
+                            bs_heating_amplitude
+                            if bs_heating_amplitude is not None
+                            else None
+                        ),
                     )
 
-
-            with exp.section(uid="bs", play_after=None, on_system_grid=True):
-                exp.play(
-                    signal="bs",
-                    pulse=bs,
-                    length=bs_length,
-                    amplitude=bs_amplitude if bs_amplitude is not None else None,
-                )
-            play_after = "bs"
-
-            if prepare_f:
                 with exp.section(
-                    uid="ge_excitation", play_after="bs", on_system_grid=True
+                    uid="bs", play_after="bs_off_resonant", on_system_grid=True
                 ):
                     exp.play(
-                        signal="qb_drive",
-                        pulse=ge_X180,
+                        signal="bs",
+                        pulse=bs,
+                        length=bs_length,
+                        amplitude=(
+                            bs_amplitude if bs_amplitude is not None else None
+                        ),  # can/should this be none? it's defined above in the case of "none" usually
                     )
+                play_after = "bs"
+
+                if prepare_f:
+                    with exp.section(
+                        uid="ge_excitation", play_after="bs", on_system_grid=True
+                    ):
+                        exp.play(
+                            signal="qb_drive",
+                            pulse=ge_X180,
+                        )
+                    with exp.section(
+                        uid="ef_excitation",
+                        play_after="ge_excitation",
+                        on_system_grid=True,
+                    ):
+                        exp.play(
+                            signal="qb_ef_drive",
+                            pulse=ef_X180,
+                        )
+                    play_after = "ef_excitation"
+
                 with exp.section(
-                    uid="ef_excitation", play_after="ge_excitation", on_system_grid=True
+                    uid="f0g1", play_after=play_after, on_system_grid=True
+                ):
+                    exp.play(
+                        signal=sb_drive_lines["f0g1"],
+                        pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
+                        length=swp_param,
+                    )
+
+                with exp.section(
+                    uid="ef_excitation_2", play_after="f0g1", on_system_grid=True
                 ):
                     exp.play(
                         signal="qb_ef_drive",
                         pulse=ef_X180,
                     )
-                play_after = "ef_excitation"
 
-            with exp.section(uid="f0g1", play_after=play_after, on_system_grid=True):
-                exp.play(
-                    signal=sb_drive_lines["f0g1"],
-                    pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
-                    length=swp_param,
-                )
-
-            with exp.section(
-                uid="ef_excitation_2", play_after="f0g1", on_system_grid=True
-            ):
-                exp.play(
-                    signal="qb_ef_drive",
-                    pulse=ef_X180,
-                )
-
-            with exp.section(
-                uid="readout", play_after="ef_excitation_2", on_system_grid=True
-            ):
-                exp.measure(
-                    measure_signal="measure",
-                    measure_pulse=readout_pulse,
-                    acquire_signal="acquire",
-                    integration_kernel=kernels,
-                    handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
-                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
-                )
+                with exp.section(
+                    uid="readout", play_after="ef_excitation_2", on_system_grid=True
+                ):
+                    exp.measure(
+                        measure_signal="measure",
+                        measure_pulse=readout_pulse,
+                        acquire_signal="acquire",
+                        integration_kernel=kernels,
+                        handle="ac_0",
+                        reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                        acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                    )
 
     # setup calibration and signal map for the experiment
     sig_freq_map = create_default_map_and_calibration(
@@ -179,6 +209,12 @@ def bs_mode_nth_sb(
     sig_freq_map[serial_num][ch]["bs"] = {}
     sig_freq_map[serial_num][ch]["bs"]["frequency"] = bs_freq - lo
     sig_freq_map[serial_num][ch]["bs"]["range"] = bs_range
+
+    sig_freq_map[serial_num][ch]["bs_off_resonant"] = {}
+    sig_freq_map[serial_num][ch]["bs_off_resonant"]["frequency"] = (
+        bs_freq_off_resonant - lo
+    )
+    sig_freq_map[serial_num][ch]["bs_off_resonant"]["range"] = bs_range
 
     print(sig_freq_map[serial_num][ch])
 

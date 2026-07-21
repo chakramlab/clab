@@ -51,6 +51,8 @@ def iq_blobs_sweep(
     
     if measure_pulse_amplitude is not None:
         swp_param = measure_pulse_amplitude
+    else:
+        measure_pulse_amplitude = qubit_parameters["q0"]["ro_amp"]
 
     if reset_delay is not None:
         swp_param = reset_delay
@@ -67,6 +69,7 @@ def iq_blobs_sweep(
         uid=exp_id,
         signals=[
             ExperimentSignal("qb_drive"),
+            ExperimentSignal("qb_ef_drive"),
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
         ],
@@ -117,9 +120,11 @@ def iq_blobs_sweep(
                 )
 
             if measure_f:
+                with exp.section(uid="qubit_ge_excitation_1", play_after="readout_e"):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
 
-                with exp.section(uid="qubit_ef_excitation", play_after="readout_e"):
-                    exp.play(signal="qb_drive", pulse=ef_X180)
+                with exp.section(uid="qubit_ef_excitation", play_after="qubit_ge_excitation_1", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
                 with exp.section(uid="readout_f", play_after="qubit_ef_excitation"):
                     exp.measure(
@@ -132,7 +137,7 @@ def iq_blobs_sweep(
                         acquire_delay=acquire_delay,
                         integration_length=readout_pulse.length-acquire_delay if acquire_delay is not None else readout_pulse.length,
                         handle="ac_2",
-                        reset_delay=reset_delay,
+                        reset_delay=qubit_parameters["q0"]["reset_delay"]*2,
                     )
 
     # setup calibration and signal map for the experiment

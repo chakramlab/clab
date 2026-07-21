@@ -38,7 +38,8 @@ def bs_rabi_post_selected_2buffer(
     swp_amp=False,
     storage_mode=1,
     sb_delay=0,
-    averaging_mode=AveragingMode.CYCLIC
+    averaging_mode=AveragingMode.SINGLE_SHOT,
+    final_mapping="no pi pulse"
 ):
 
     # Load device and config params
@@ -126,58 +127,174 @@ def bs_rabi_post_selected_2buffer(
         uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type, averaging_mode=averaging_mode
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True,
-        ):
-            # Initial excitation to transmon e, then f, then to rabi buffer
-            with exp.section(uid="ge_excitation", play_after=None, on_system_grid=True):
-                exp.play(signal="qb_drive", pulse=ge_X180)
+                uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True,
+            ):
+            if final_mapping=="no pi pulse":
+                # Initial excitation to transmon e, then f, then to rabi buffer
+                with exp.section(uid="ge_excitation_0", play_after=None, on_system_grid=True):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
 
-            with exp.section(uid="ef_excitation", play_after="ge_excitation", on_system_grid=True):
-                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                with exp.section(uid="ef_excitation_0", play_after="ge_excitation_0", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
-            with exp.section(uid="sb_load_rabi_buffer", play_after="ef_excitation", on_system_grid=True):
-                exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
-                exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                with exp.section(uid="sb_load_rabi_buffer_0", play_after="ef_excitation_0", on_system_grid=True):
+                    exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                # Rabi sweep
+                with exp.section(uid="bs_rabi_sweep_0", play_after="sb_load_rabi_buffer_0", on_system_grid=True):
+                    exp.play(
+                        signal="bs_rabi", pulse=bs_rabi_pulse,
+                        length=bs_length_rabi, amplitude=bs_amplitude_rabi
+                    )
 
-            # Rabi sweep
-            with exp.section(uid="bs_rabi_sweep", play_after="sb_load_rabi_buffer", on_system_grid=True):
-                exp.play(
-                    signal="bs_rabi", pulse=bs_rabi_pulse,
-                    length=bs_length_rabi, amplitude=bs_amplitude_rabi
-                )
+                # Post-selection / Erasure Check (2-buffer scheme)
+                # 1. Move Storage to Bob (ro_buffer)
+                with exp.section(uid="bs_move_storage_to_ro_buffer_0", play_after="bs_rabi_sweep_0", on_system_grid=True):
+                    exp.play(signal="bs_ro", pulse=bs_ro_pulse)
 
-            # Post-selection / Erasure Check (2-buffer scheme)
-            # 1. Move Storage to Bob (ro_buffer)
-            with exp.section(uid="bs_move_storage_to_ro_buffer", play_after="bs_rabi_sweep", on_system_grid=True):
-                exp.play(signal="bs_ro", pulse=bs_ro_pulse)
+                # 2. Sideband Alice (rabi_buffer) -> Transmon f
+                with exp.section(uid="sb_unload_rabi_buffer_0", play_after="bs_move_storage_to_ro_buffer_0", on_system_grid=True):
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                    exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
 
-            # 2. Sideband Alice (rabi_buffer) -> Transmon f
-            with exp.section(uid="sb_unload_rabi_buffer", play_after="bs_move_storage_to_ro_buffer", on_system_grid=True):
-                exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
-                exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
-                exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                # 3. Transmon f -> e
+                with exp.section(uid="ef_swap_0", play_after="sb_unload_rabi_buffer_0", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
-            # 3. Transmon f -> e
-            with exp.section(uid="ef_swap", play_after="sb_unload_rabi_buffer", on_system_grid=True):
-                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                # 4. Sideband Bob (ro_buffer) -> Transmon f
+                with exp.section(uid="sb_unload_ro_buffer_0", play_after="ef_swap_0", on_system_grid=True):
+                    exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
+                    exp.play(signal=sb_drive_lines_ro["f0g1"], pulse=sb_f0g1_ro)
+                    exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
 
-            # 4. Sideband Bob (ro_buffer) -> Transmon f
-            with exp.section(uid="sb_unload_ro_buffer", play_after="ef_swap", on_system_grid=True):
-                exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
-                exp.play(signal=sb_drive_lines_ro["f0g1"], pulse=sb_f0g1_ro)
-                exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
+                # 5. Readout
+                with exp.section(uid="readout_0", play_after="sb_unload_ro_buffer_0", on_system_grid=True):
+                    exp.measure(
+                        measure_signal="measure",
+                        measure_pulse=readout_pulse,
+                        acquire_signal="acquire",
+                        integration_kernel=kernels,
+                        handle="ac_0",
+                        reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
+                        acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                    )
 
-            # 5. Readout
-            with exp.section(uid="readout", play_after="sb_unload_ro_buffer", on_system_grid=True):
-                exp.measure(
-                    measure_signal="measure",
-                    measure_pulse=readout_pulse,
-                    acquire_signal="acquire",
-                    integration_kernel=kernels,
-                    handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
-                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
-                )
+            elif final_mapping=="pi pulse":
+                # Initial excitation to transmon e, then f, then to rabi buffer
+                with exp.section(uid="ge_excitation_1", play_after=None, on_system_grid=True):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+
+                with exp.section(uid="ef_excitation_1", play_after="ge_excitation_1", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+
+                with exp.section(uid="sb_load_rabi_buffer_1", play_after="ef_excitation_1", on_system_grid=True):
+                    exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+
+                # Rabi sweep
+                with exp.section(uid="bs_rabi_sweep_1", play_after="sb_load_rabi_buffer_1", on_system_grid=True):
+                    exp.play(
+                        signal="bs_rabi", pulse=bs_rabi_pulse,
+                        length=bs_length_rabi, amplitude=bs_amplitude_rabi
+                    )
+
+                # Post-selection / Erasure Check (2-buffer scheme)
+                # 1. Move Storage to Bob (ro_buffer)
+                with exp.section(uid="bs_move_storage_to_ro_buffer_1", play_after="bs_rabi_sweep_1", on_system_grid=True):
+                    exp.play(signal="bs_ro", pulse=bs_ro_pulse)
+
+                # 2. Sideband Alice (rabi_buffer) -> Transmon f
+                with exp.section(uid="sb_unload_rabi_buffer_1", play_after="bs_move_storage_to_ro_buffer_1", on_system_grid=True):
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                    exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+
+                # 3. Transmon f -> e
+                with exp.section(uid="ef_swap_1", play_after="sb_unload_rabi_buffer_1", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+
+                # 4. Sideband Bob (ro_buffer) -> Transmon f
+                with exp.section(uid="sb_unload_ro_buffer_1", play_after="ef_swap_1", on_system_grid=True):
+                    exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
+                    exp.play(signal=sb_drive_lines_ro["f0g1"], pulse=sb_f0g1_ro)
+                    exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
+
+                with exp.section(uid="ge_1_0", play_after="sb_unload_ro_buffer_1", on_system_grid=True):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+
+                # 5. Readout
+                with exp.section(uid="readout_1", play_after="ge_1_0", on_system_grid=True):
+                    exp.measure(
+                        measure_signal="measure",
+                        measure_pulse=readout_pulse,
+                        acquire_signal="acquire",
+                        integration_kernel=kernels,
+                        handle="ac_1",
+                        reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
+                        acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                    )
+
+            elif final_mapping=="pi pulse 2":
+                # Initial excitation to transmon e, then f, then to rabi buffer
+                with exp.section(uid="ge_excitation_2", play_after=None, on_system_grid=True):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+
+                with exp.section(uid="ef_excitation_2", play_after="ge_excitation_2", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+
+                with exp.section(uid="sb_load_rabi_buffer_2", play_after="ef_excitation_2", on_system_grid=True):
+                    exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+
+                # Rabi sweep
+                with exp.section(uid="bs_rabi_sweep_2", play_after="sb_load_rabi_buffer_2", on_system_grid=True):
+                    exp.play(
+                        signal="bs_rabi", pulse=bs_rabi_pulse,
+                        length=bs_length_rabi, amplitude=bs_amplitude_rabi
+                    )
+
+                # Post-selection / Erasure Check (2-buffer scheme)
+                # 1. Move Storage to Bob (ro_buffer)
+                with exp.section(uid="bs_move_storage_to_ro_buffer_2", play_after="bs_rabi_sweep_2", on_system_grid=True):
+                    exp.play(signal="bs_ro", pulse=bs_ro_pulse)
+
+                # 2. Sideband Alice (rabi_buffer) -> Transmon f
+                with exp.section(uid="sb_unload_rabi_buffer_2", play_after="bs_move_storage_to_ro_buffer_2", on_system_grid=True):
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+                    exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1_rabi)
+                    exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
+
+                # 3. Transmon f -> e
+                with exp.section(uid="ef_swap_2", play_after="sb_unload_rabi_buffer_2", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+
+                # 4. Sideband Bob (ro_buffer) -> Transmon f
+                with exp.section(uid="sb_unload_ro_buffer_2", play_after="ef_swap_2", on_system_grid=True):
+                    exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
+                    exp.play(signal=sb_drive_lines_ro["f0g1"], pulse=sb_f0g1_ro)
+                    exp.delay(signal=sb_drive_lines_ro["f0g1"], time=sb_delay)
+
+                with exp.section(uid="ge_2_0", play_after="sb_unload_ro_buffer_2", on_system_grid=True):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+
+                with exp.section(uid="ef_2_0", play_after="ge_2_0", on_system_grid=True):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                
+                with exp.section(uid="ge_2_1", play_after="ef_2_0", on_system_grid=True):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+
+                # 5. Readout
+                with exp.section(uid="readout_2", play_after="ge_2_1", on_system_grid=True):
+                    exp.measure(
+                        measure_signal="measure",
+                        measure_pulse=readout_pulse,
+                        acquire_signal="acquire",
+                        integration_kernel=kernels,
+                        handle="ac_2",
+                        reset_delay=qubit_parameters["q0"]["cavity_reset_delay"] if reset_delay is None else reset_delay,
+                        acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                    )
 
     # setup calibration and signal map for the experiment
     sig_freq_map = create_default_map_and_calibration(
