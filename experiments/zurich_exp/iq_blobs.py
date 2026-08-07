@@ -16,7 +16,7 @@ def iq_blobs(
     serial_num,
     qubit_params_file_path,
     exp_id="iq_blobs",
-    average_exponent=12,
+    shots=1500,
     frequency=None,
     amplitude=None,
     acquire_delay=None,
@@ -59,7 +59,7 @@ def iq_blobs(
 
     with exp.acquire_loop_rt(
         uid="shots",
-        count=pow(2, average_exponent),
+        count=shots,
         acquisition_type=AcquisitionType.INTEGRATION,
         averaging_mode=AveragingMode.SINGLE_SHOT,
     ):

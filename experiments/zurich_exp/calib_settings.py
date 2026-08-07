@@ -148,7 +148,7 @@ def create_default_map_and_calibration(
         sig_freq_map[serial_num][ch]["qb_drive"]["SW_override"] = qb_drive_SW_override
 
     if "qb_drive_resolved" in exp.signals:
-        ch = "SG3"
+        ch = "SG0"
         sig_freq_map[serial_num][ch]["qb_drive_resolved"] = {}
         sig_freq_map[serial_num][ch]["qb_drive_resolved"]["frequency"] = (
             qubit_parameters["q0"]["qb_resolved_freq"] - qb_resolved_lo

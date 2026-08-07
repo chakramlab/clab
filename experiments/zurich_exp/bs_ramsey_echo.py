@@ -103,8 +103,8 @@ def bs_ramsey_echo(
 
     # CPMG delays
     if n_echoes > 0:
-        tau_half = time_swp.values / (2 * n_echoes)
-        tau_full = time_swp.values / n_echoes
+        tau_half = time_swp / (2 * n_echoes)
+        tau_full = time_swp / n_echoes
 
     with exp.acquire_loop_rt(
         uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type

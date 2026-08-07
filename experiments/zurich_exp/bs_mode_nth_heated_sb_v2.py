@@ -17,23 +17,27 @@ def bs_mode_nth_heated_sb_v2(
     qubit_params_file_path,
     exp_id="bs_mode_nth_heated_sb_v2",
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
-    swp_param_off_resonant=LinearSweepParameter(
+    bs_heating_swp_param=LinearSweepParameter(
         uid="swp_param_off_resonant", start=1e-9, stop=10e-6, count=6
     ),
     swp_param=LinearSweepParameter(uid="swp_param", start=1e-9, stop=10e-6, count=6),
     prepare_f=True,
-    bs_freq_off_resonant=None,
-    bs_freq=None,
-    bs_range=None,
-    bs_length=None,
-    bs_amplitude=None,
+    bs_heating_freq=None,    
     bs_heating_amplitude=None,
+    bs_heating_range=None,
+    bs_swap_freq=None,
+    bs_swap_range=None,
+    bs_swap_length=None,
+    bs_swap_amplitude=None,
+    reset_delay=None,
     acquisition_type=AcquisitionType.INTEGRATION,
-    alice_or_bob="alice",
+    alice_or_bob_heating="alice",
+    alice_or_bob_swap="bob",
     max_fock_state=1,
     rotate_ro=False,
     thresholds=None,
-    storage_mode=0,
+    swap_storage_mode=0,
+    heated_storage_mode=0,
     chunk_count=None,
 ):
 
@@ -48,44 +52,49 @@ def bs_mode_nth_heated_sb_v2(
     sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
     sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
 
-    # bs pulse (actual resonant one). The off-resonant heating pulse reuses the
-    # same envelope, played on its own signal at bs_freq_off_resonant.
-    bs = qubit_params_module.sb_pulses[alice_or_bob][f"bs{storage_mode}"]
-    if bs_length is None:
-        bs_length = bs.length
-    if bs_amplitude is not None:
-        bs.amplitude = 1
-    if bs_range is None:
-        bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
-    if bs_freq is None:
-        bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
-    if bs_heating_amplitude is None:
-        bs_heating_amplitude = bs_amplitude
-    if bs_freq_off_resonant is None:
-        raise ValueError(
-            "Please provide bs_freq_off_resonant (frequency of the heating drive)."
-        )
+    # bs pulse (actual resonant one)
+    bs_swap = qubit_params_module.sb_pulses[alice_or_bob_swap][f"bs{swap_storage_mode}"]
+    if bs_swap_length is None:
+        bs_swap_length = bs_swap.length
+    if bs_swap_amplitude is not None:
+        bs_swap.amplitude = 1
+    if bs_swap_range is None:
+        bs_swap_range = qubit_parameters["q0"][f"bs_{alice_or_bob_swap}_dBm_ranges"][swap_storage_mode]
+    if bs_swap_freq is None:
+        bs_swap_freq = qubit_parameters["q0"][f"bs_{alice_or_bob_swap}_freqs"][swap_storage_mode]
+
+    # heating pulse
+    bs_heating = qubit_params_module.sb_pulses[alice_or_bob_heating][f"bs{heated_storage_mode}"]
+    if bs_heating_amplitude is not None:
+        bs_heating.amplitude = 1
+    if bs_heating_freq is None:
+        print(f"bs_heating_freq is None, using bs_{alice_or_bob_heating}_freqs[{heated_storage_mode}]")
+        bs_heating_freq = qubit_parameters["q0"][f"bs_{alice_or_bob_heating}_freqs"][heated_storage_mode]
+    if bs_heating_range is None:
+        bs_heating_range = qubit_parameters["q0"][f"bs_{alice_or_bob_heating}_dBm_ranges"][heated_storage_mode]
+        if bs_heating_range != bs_swap_range:
+            print(f"Warning: bs_heating_range ({bs_heating_range}) != bs_swap_range ({bs_swap_range})")
 
     lo = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_range = 0.5e9
-    if bs_freq < lo - lo_range or bs_freq > lo + lo_range:
+    if bs_swap_freq < lo - lo_range or bs_swap_freq > lo + lo_range:
         old_lo = lo
-        new_lo = bs_freq
+        new_lo = bs_swap_freq
         step = 200e6
         new_lo = round(new_lo / step) * step
         lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
         lo = new_lo
         print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
         lo_change = True
-    if bs_freq_off_resonant < lo - lo_range or bs_freq_off_resonant > lo + lo_range:
+    if bs_heating_freq < lo - lo_range or bs_heating_freq > lo + lo_range:
         print(
-            f"WARNING: Frequency for off-resonant BS pulse {bs_freq_off_resonant/1e9} GHz is out of range of LO {lo/1e9} GHz +/- {lo_range/1e9} GHz"
+            f"WARNING: Frequency for heating BS pulse {bs_heating_freq/1e9} GHz is out of range of LO {lo/1e9} GHz +/- {lo_range/1e9} GHz"
         )
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
     for transition in transitions:
-        if alice_or_bob == "alice":
+        if alice_or_bob_swap == "alice":
             sb_drive_lines[transition] = f"sb_drive_alice_{transition}"
         else:
             sb_drive_lines[transition] = f"sb_drive_bob_{transition}"
@@ -96,8 +105,8 @@ def bs_mode_nth_heated_sb_v2(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("bs"),
-            ExperimentSignal("bs_off_resonant"),
+            ExperimentSignal("bs_swap"),
+            ExperimentSignal("bs_heating"),
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
@@ -107,8 +116,8 @@ def bs_mode_nth_heated_sb_v2(
         uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep_off_resonant",
-            parameter=swp_param_off_resonant,
+            uid="time_or_amp_sweep_heating",
+            parameter=bs_heating_swp_param,
             reset_oscillator_phase=True,
             chunk_count=chunk_count,
         ):
@@ -120,12 +129,12 @@ def bs_mode_nth_heated_sb_v2(
             ):
 
                 with exp.section(
-                    uid="bs_off_resonant", play_after=None, on_system_grid=True
+                    uid="bs_heating", play_after=None, on_system_grid=True
                 ):
                     exp.play(
-                        signal="bs_off_resonant",
-                        pulse=bs,
-                        length=swp_param_off_resonant,
+                        signal="bs_heating",
+                        pulse=bs_heating,
+                        length=bs_heating_swp_param,
                         amplitude=(
                             bs_heating_amplitude
                             if bs_heating_amplitude is not None
@@ -134,21 +143,21 @@ def bs_mode_nth_heated_sb_v2(
                     )
 
                 with exp.section(
-                    uid="bs", play_after="bs_off_resonant", on_system_grid=True
+                    uid="bs_swap", play_after="bs_heating", on_system_grid=True
                 ):
                     exp.play(
-                        signal="bs",
-                        pulse=bs,
-                        length=bs_length,
+                        signal="bs_swap",
+                        pulse=bs_swap,
+                        length=bs_swap_length,
                         amplitude=(
-                            bs_amplitude if bs_amplitude is not None else None
-                        ),  # can/should this be none? it's defined above in the case of "none" usually
+                            bs_swap_amplitude if bs_swap_amplitude is not None else None
+                        ), 
                     )
-                play_after = "bs"
+                play_after = "bs_swap"
 
                 if prepare_f:
                     with exp.section(
-                        uid="ge_excitation", play_after="bs", on_system_grid=True
+                        uid="ge_excitation", play_after="bs_swap", on_system_grid=True
                     ):
                         exp.play(
                             signal="qb_drive",
@@ -170,7 +179,7 @@ def bs_mode_nth_heated_sb_v2(
                 ):
                     exp.play(
                         signal=sb_drive_lines["f0g1"],
-                        pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
+                        pulse=sb_f0g1_alice if alice_or_bob_swap == "alice" else sb_f0g1_bob,
                         length=swp_param,
                     )
 
@@ -191,7 +200,7 @@ def bs_mode_nth_heated_sb_v2(
                         acquire_signal="acquire",
                         integration_kernel=kernels,
                         handle="ac_0",
-                        reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                        reset_delay=reset_delay if reset_delay is not None else qubit_parameters["q0"]["cavity_reset_delay"],
                         acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                     )
 
@@ -206,15 +215,13 @@ def bs_mode_nth_heated_sb_v2(
     )
 
     ch = "SG4"
-    sig_freq_map[serial_num][ch]["bs"] = {}
-    sig_freq_map[serial_num][ch]["bs"]["frequency"] = bs_freq - lo
-    sig_freq_map[serial_num][ch]["bs"]["range"] = bs_range
+    sig_freq_map[serial_num][ch]["bs_swap"] = {}
+    sig_freq_map[serial_num][ch]["bs_swap"]["frequency"] = bs_swap_freq - lo
+    sig_freq_map[serial_num][ch]["bs_swap"]["range"] = bs_swap_range
 
-    sig_freq_map[serial_num][ch]["bs_off_resonant"] = {}
-    sig_freq_map[serial_num][ch]["bs_off_resonant"]["frequency"] = (
-        bs_freq_off_resonant - lo
-    )
-    sig_freq_map[serial_num][ch]["bs_off_resonant"]["range"] = bs_range
+    sig_freq_map[serial_num][ch]["bs_heating"] = {}
+    sig_freq_map[serial_num][ch]["bs_heating"]["frequency"] = (bs_heating_freq - lo)
+    sig_freq_map[serial_num][ch]["bs_heating"]["range"] = bs_heating_range
 
     print(sig_freq_map[serial_num][ch])
 
