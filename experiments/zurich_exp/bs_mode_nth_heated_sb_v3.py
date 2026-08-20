@@ -11,11 +11,11 @@ from .laboneq_helper import default_signal_map_and_calibration
 from .load_qubit_params import load_qubit_params
 
 
-def bs_mode_nth_heated_sb_v2(
+def bs_mode_nth_heated_sb_v3(
     device_setup,
     serial_num,
     qubit_params_file_path,
-    exp_id="bs_mode_nth_heated_sb_v2",
+    exp_id="bs_mode_nth_heated_sb_v3",
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
     bs_heating_swp_param=LinearSweepParameter(
         uid="swp_param_off_resonant", start=1e-9, stop=10e-6, count=6
@@ -89,20 +89,28 @@ def bs_mode_nth_heated_sb_v2(
                 f"Warning: bs_heating_range ({bs_heating_range}) != bs_swap_range ({bs_swap_range})"
             )
 
-    lo = lo_settings["q0"][serial_num]["SG4_LO"]
+    lo_heating = lo_settings["q0"][serial_num]["SG2_LO"]
+    lo_swap = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_range = 0.5e9
+    lo_min = 1e9
 
-    assert (
-        abs(bs_heating_freq - bs_swap_freq) < 1e9
-    ), "Error: heating and swap frequencies are too far apart."
+    for lo, bs_type, bs_freq, lo_name in zip(
+        [lo_heating, lo_swap],
+        ["heating", "swap"],
+        [bs_heating_freq, bs_swap_freq],
+        ["SG2_LO", "SG4_LO"],
+    ):
+        new_lo = bs_freq
+        step = 200e6
+        new_lo = round(new_lo / step) * step
+        if new_lo < lo_min:
+            new_lo = lo_min
 
-    new_lo = (bs_heating_freq + bs_swap_freq) / 2
-    step = 200e6
-    new_lo = round(new_lo / step) * step
-    lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
-    lo = new_lo
-    print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
-    lo_change = True
+        lo_settings["q0"][serial_num][lo_name] = new_lo
+        print(
+            f"Warning: {bs_type} LO ({lo_name}) frequency changed to {new_lo/1e9} GHz"
+        )
+        lo_change = True
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
@@ -235,16 +243,21 @@ def bs_mode_nth_heated_sb_v2(
         thresholds=thresholds,
     )
 
+    lo_swap = lo_settings["q0"][serial_num]["SG4_LO"]
     ch = "SG4"
     sig_freq_map[serial_num][ch]["bs_swap"] = {}
-    sig_freq_map[serial_num][ch]["bs_swap"]["frequency"] = bs_swap_freq - lo
+    sig_freq_map[serial_num][ch]["bs_swap"]["frequency"] = bs_swap_freq - lo_swap
     sig_freq_map[serial_num][ch]["bs_swap"]["range"] = bs_swap_range
 
+    lo_heating = lo_settings["q0"][serial_num]["SG2_LO"]
+    ch = "SG3"
     sig_freq_map[serial_num][ch]["bs_heating"] = {}
-    sig_freq_map[serial_num][ch]["bs_heating"]["frequency"] = bs_heating_freq - lo
+    sig_freq_map[serial_num][ch]["bs_heating"]["frequency"] = (
+        bs_heating_freq - lo_heating
+    )
     sig_freq_map[serial_num][ch]["bs_heating"]["range"] = bs_heating_range
 
-    print(sig_freq_map[serial_num][ch])
+    print(f"lo_swap: {lo_swap}, lo_heating: {lo_heating}")
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,
@@ -257,4 +270,4 @@ def bs_mode_nth_heated_sb_v2(
     exp.set_calibration(exp_calibration)
     exp.set_signal_map(map_q0)
 
-    return exp, lo
+    return exp, None

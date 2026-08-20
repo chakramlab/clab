@@ -16,9 +16,7 @@ def _transition_to_index(transition: str) -> int:
     return f_idx
 
 
-def _get_sb_value(
-    qparams: dict, buffer_mode: str, transition: str, kind: str
-) -> float:
+def _get_sb_value(qparams: dict, buffer_mode: str, transition: str, kind: str) -> float:
     """Lookup sideband values using arrays with legacy fallback."""
     idx = _transition_to_index(transition)
     array_keys = {
@@ -47,9 +45,7 @@ def _get_sb_value(
     )
 
 
-def _get_bs_value(
-    qparams: dict, buffer_mode: str, index: int, kind: str
-) -> float:
+def _get_bs_value(qparams: dict, buffer_mode: str, index: int, kind: str) -> float:
     """Lookup beamsplitter values using arrays with legacy fallback."""
     array_keys = {
         "freq": f"bs_{buffer_mode}_freqs",
@@ -148,16 +144,18 @@ def create_default_map_and_calibration(
         sig_freq_map[serial_num][ch]["qb_drive"]["SW_override"] = qb_drive_SW_override
 
     if "qb_drive_resolved" in exp.signals:
-        ch = "SG0"
+        ch = "SG5"
         sig_freq_map[serial_num][ch]["qb_drive_resolved"] = {}
         sig_freq_map[serial_num][ch]["qb_drive_resolved"]["frequency"] = (
             qubit_parameters["q0"]["qb_resolved_freq"] - qb_resolved_lo
         )
-        sig_freq_map[serial_num][ch]["qb_drive_resolved"]["range"] = qubit_parameters["q0"][
-            "qb_drive_resolved_dBm_range"
-        ]
+        sig_freq_map[serial_num][ch]["qb_drive_resolved"]["range"] = qubit_parameters[
+            "q0"
+        ]["qb_drive_resolved_dBm_range"]
         sig_freq_map[serial_num][ch]["qb_drive_resolved"]["automute"] = automute
-        sig_freq_map[serial_num][ch]["qb_drive_resolved"]["SW_override"] = qb_resolved_SW_override
+        sig_freq_map[serial_num][ch]["qb_drive_resolved"][
+            "SW_override"
+        ] = qb_resolved_SW_override
 
     if "qb_ef_drive" in exp.signals:
         ch = "SG0"
@@ -214,8 +212,8 @@ def create_default_map_and_calibration(
             )
             sig_freq_map[serial_num][ch][signal_name]["automute"] = automute
             sig_freq_map[serial_num][ch][signal_name]["SW_override"] = sb_SW_override
-            sig_freq_map[serial_num][ch][signal_name]["length"] = (
-                _get_bs_value(qubit_parameters["q0"], buffer_mode, bs_index, "flat_len")
+            sig_freq_map[serial_num][ch][signal_name]["length"] = _get_bs_value(
+                qubit_parameters["q0"], buffer_mode, bs_index, "flat_len"
             )
 
     # sideband signals
@@ -230,9 +228,9 @@ def create_default_map_and_calibration(
                 _get_sb_value(qubit_parameters["q0"], buffer_mode, transition, "freq")
                 - sb_lo
             )
-            sig_freq_map[serial_num][ch][signal_name]["range"] = qubit_parameters[
-                "q0"
-            ][f"sb_{buffer_mode}_dBm_range"]
+            sig_freq_map[serial_num][ch][signal_name]["range"] = qubit_parameters["q0"][
+                f"sb_{buffer_mode}_dBm_range"
+            ]
             sig_freq_map[serial_num][ch][signal_name]["length"] = _get_sb_value(
                 qubit_parameters["q0"], buffer_mode, transition, "flat_len"
             )
@@ -249,9 +247,7 @@ def create_default_map_and_calibration(
             "q0"
         ]["sb_readout_dBm_range"]
         sig_freq_map[serial_num][ch]["sb_drive_readout"]["automute"] = automute
-        sig_freq_map[serial_num][ch]["sb_drive_readout"][
-            "SW_override"
-        ] = sb_SW_override
+        sig_freq_map[serial_num][ch]["sb_drive_readout"]["SW_override"] = sb_SW_override
 
     # measure and acquire should be added to signals in pairs.
     if ("measure" in exp.signals) or ("acquire" in exp.signals):

@@ -24,9 +24,10 @@ def sideband_and_pnrqs(
     alice_or_bob="alice",
     rotate_ro=False,
     thresholds=None,
-    max_fock_state = 1, ## only works for 1 now
-    prepare_fock_state = True
-    ):
+    max_fock_state=1,  ## only works for 1 now
+    prepare_fock_state=True,
+    prepare_superposition=False,
+):
 
     # Load device and config params
     qubit_params_module = load_qubit_params(qubit_params_file_path)
@@ -35,19 +36,19 @@ def sideband_and_pnrqs(
     qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
     kernels = qubit_params_module.acquire_kernel
     ge_X180 = qubit_params_module.ge_X180
+    ge_X90 = qubit_params_module.ge_X90
     ef_X180 = qubit_params_module.ef_X180
     resolved_X180 = qubit_params_module.resolved_X180
     sb_pulses = qubit_params_module.sb_pulses
     sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
-    sb_f0g1_bob   = qubit_params_module.sb_pulses["bob"]["f0g1"]
+    sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
 
     reset_delay = qubit_parameters["q0"]["cavity_reset_delay"]
 
-    lo = lo_settings["q0"][serial_num]['SG0_LO']
+    lo = lo_settings["q0"][serial_num]["SG4_LO"]
     freq_swp.start -= lo
     freq_swp.stop -= lo
-    
-    
+
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
     sb_drive_pulses = {}
@@ -56,7 +57,6 @@ def sideband_and_pnrqs(
             sb_drive_lines[transition] = f"sb_drive_alice_{transition}"
         else:
             sb_drive_lines[transition] = f"sb_drive_bob_{transition}"
-        
 
     # Create Experiment
     exp = Experiment(
@@ -64,7 +64,7 @@ def sideband_and_pnrqs(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("qb_selective_pi_drive"),
+            ExperimentSignal("qb_drive_resolved"),
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
@@ -78,23 +78,52 @@ def sideband_and_pnrqs(
     ):
         with exp.sweep(
             uid="spect_sweep", parameter=freq_swp, reset_oscillator_phase=True
-        ): 
+        ):
             if prepare_fock_state:
-                with exp.section(uid = "ge_excitation",  play_after=None): #alignment=SectionAlignment.RIGHT):
-                    exp.play(signal = "qb_drive", pulse = ge_X180)
-                with exp.section(uid = "ef_excitation", play_after= "ge_excitation", on_system_grid=True):
-                    exp.play(signal = "qb_ef_drive", pulse = ef_X180)
-                with exp.section(uid = "sb_transition_f0g1", play_after = "ef_excitation"):
-                    exp.play(signal = sb_drive_lines["f0g1"], pulse = sb_f0g1_alice if alice_or_bob=="alice" else sb_f0g1_bob)
-                with exp.section(uid = "fe_transition", play_after = "sb_transition_f0g1"):
-                    exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+                with exp.section(
+                    uid="ge_excitation", play_after=None
+                ):  # alignment=SectionAlignment.RIGHT):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+                with exp.section(
+                    uid="ef_excitation", play_after="ge_excitation", on_system_grid=True
+                ):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                with exp.section(uid="sb_transition_f0g1", play_after="ef_excitation"):
+                    exp.play(
+                        signal=sb_drive_lines["f0g1"],
+                        pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
+                    )
+                with exp.section(uid="fe_transition", play_after="sb_transition_f0g1"):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
                 play_after = "fe_transition"
             else:
                 play_after = None
 
-            with exp.section(uid="resolved_pi_ge", play_after=play_after, on_system_grid=True):
-                exp.play(signal="qb_selective_pi_drive", pulse=resolved_X180)
-            with exp.section(uid="readout", play_after="resolved_pi_ge", on_system_grid=True):
+            if prepare_superposition:
+                with exp.section(
+                    uid="ge_excitation", play_after=None
+                ):  # alignment=SectionAlignment.RIGHT):
+                    exp.play(signal="qb_drive", pulse=ge_X90)
+                with exp.section(
+                    uid="ef_excitation", play_after="ge_excitation", on_system_grid=True
+                ):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                with exp.section(uid="sb_transition_f0g1", play_after="ef_excitation"):
+                    exp.play(
+                        signal=sb_drive_lines["f0g1"],
+                        pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
+                    )
+                play_after = "sb_transition_f0g1"
+            else:
+                play_after = None
+
+            with exp.section(
+                uid="resolved_pi_ge", play_after=play_after, on_system_grid=True
+            ):
+                exp.play(signal="qb_drive_resolved", pulse=resolved_X180)
+            with exp.section(
+                uid="readout", play_after="resolved_pi_ge", on_system_grid=True
+            ):
                 exp.measure(
                     measure_signal="measure",
                     measure_pulse=readout_pulse,
@@ -102,7 +131,7 @@ def sideband_and_pnrqs(
                     integration_kernel=kernels,
                     handle="ac_0",
                     reset_delay=reset_delay,
-                    acquire_delay=qubit_parameters['q0']['acquire_delay']
+                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
     # setup calibration and signal map for the experiment
@@ -115,16 +144,8 @@ def sideband_and_pnrqs(
         thresholds=thresholds,
     )
 
-
-    ch = "SG3"
-    sig_freq_map[serial_num][ch]["qb_selective_pi_drive"] = {}
-    sig_freq_map[serial_num][ch]["qb_selective_pi_drive"]["frequency"] = freq_swp
-    sig_freq_map[serial_num][ch]["qb_selective_pi_drive"]["range"] = qubit_parameters[
-        "q0"]["qb_drive_resolved_dBm_range"
-              ]
-    sig_freq_map[serial_num][ch]["qb_selective_pi_drive"]["automute"] = True
-
-    print(sig_freq_map[serial_num]['SG1']["sb_drive_bob_f0g1"])
+    ch = "SG5"
+    sig_freq_map[serial_num][ch]["qb_drive_resolved"]["frequency"] = freq_swp
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

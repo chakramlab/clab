@@ -17,7 +17,7 @@ def qubit_ge_spectroscopy(
     ),
     amplitude_factor=None,
     resolved=False,
-    chunk_count=1
+    chunk_count=1,
 ):
 
     # Load device and config params
@@ -35,11 +35,11 @@ def qubit_ge_spectroscopy(
         else:
             length = ge_X180.length
 
-    lo = lo_settings["q0"][serial_num]['SG0_LO']
+    lo = lo_settings["q0"][serial_num]["SG0_LO"]
     freq_swp.start -= lo
     freq_swp.stop -= lo
 
-    qb_drive_signal = 'qb_drive_resolved' if resolved else 'qb_drive'
+    qb_drive_signal = "qb_drive_resolved" if resolved else "qb_drive"
 
     # Create Experiment
     exp = Experiment(
@@ -62,10 +62,19 @@ def qubit_ge_spectroscopy(
         reset_oscillator_phase=True,
     ):
         with exp.sweep(
-            uid="spect_sweep", parameter=freq_swp, reset_oscillator_phase=True, chunk_count=chunk_count):
+            uid="spect_sweep",
+            parameter=freq_swp,
+            reset_oscillator_phase=True,
+            chunk_count=chunk_count,
+        ):
             with exp.section(uid="qubit_excitation"):
-                exp.play(signal=qb_drive_signal, pulse=qubit_pulse, amplitude=amplitude_factor, length=length)
-            with exp.section(uid="readout", play_after="qubit_excitation"):                
+                exp.play(
+                    signal=qb_drive_signal,
+                    pulse=qubit_pulse,
+                    amplitude=amplitude_factor,
+                    length=length,
+                )
+            with exp.section(uid="readout", play_after="qubit_excitation"):
                 exp.measure(
                     measure_signal="measure",
                     measure_pulse=readout_pulse,
@@ -73,14 +82,19 @@ def qubit_ge_spectroscopy(
                     integration_kernel=kernels,
                     handle="ac_0",
                     reset_delay=qubit_parameters["q0"]["reset_delay"],
-                    acquire_delay=qubit_parameters['q0']['acquire_delay']
+                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
     # setup calibration and signal map for the experiment
-    sig_freq_map = create_default_map_and_calibration(exp, serial_num, qubit_parameters, lo_settings)
-    
+    sig_freq_map = create_default_map_and_calibration(
+        exp, serial_num, qubit_parameters, lo_settings
+    )
+
     # update the frequency to incorporate the frequency sweep
-    sig_freq_map[serial_num]["SG0"][qb_drive_signal]["frequency"] = freq_swp
+    if not resolved:
+        sig_freq_map[serial_num]["SG0"][qb_drive_signal]["frequency"] = freq_swp
+    else:
+        sig_freq_map[serial_num]["SG5"][qb_drive_signal]["frequency"] = freq_swp
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,
