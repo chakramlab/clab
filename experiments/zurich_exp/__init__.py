@@ -40,6 +40,8 @@ from .cav_rabi_t1 import cav_rabi_t1
 from .cavity_spectroscopy import cavity_spectroscopy
 from .cavity_t1_with_sb import cavity_t1_with_sb
 from .chi import chi
+from .ef_pulse_train import ef_pulse_train
+from .ge_pulse_train import ge_pulse_train
 from .iq_blobs import iq_blobs
 from .iq_blobs_2d import iq_blobs_2d
 from .iq_blobs_2d_v2 import iq_blobs_2d_v2
@@ -64,6 +66,7 @@ from .resonator_spectroscopy import resonator_spectroscopy
 from .resonator_spectroscopy_cw import resonator_spectroscopy_cw
 from .sideband_and_pnrqs import sideband_and_pnrqs
 from .sideband_buffer_ramsey import sideband_buffer_ramsey
+from .sideband_pulse_train import sideband_pulse_train
 from .sideband_rabi import sideband_rabi
 from .sideband_readout_rabi import sideband_readout_rabi
 from .sideband_readout_spectroscopy import sideband_readout_spectroscopy
