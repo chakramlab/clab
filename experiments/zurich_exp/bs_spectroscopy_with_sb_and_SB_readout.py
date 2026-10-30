@@ -30,7 +30,9 @@ def bs_spectroscopy_with_sb_and_SB_readout(
     rotate_ro=False,
     thresholds=None,
     storage_mode=1,
-    sb_delay=0
+    sb_delay=0,
+    channel=None,
+    lo_name=None,
 ):
 
     # Load device and config params
@@ -43,36 +45,38 @@ def bs_spectroscopy_with_sb_and_SB_readout(
     ef_X180 = qubit_params_module.ef_X180
     sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
     sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
-    # bs pulse
-    bs = qubit_params_module.sb_pulses[alice_or_bob][f'bs{storage_mode}']
-    if bs_length is None:
-        bs_length = bs.length
-    # if bs_ramp is None:
-    #     bs_ramp = qubit_params_module.sb_pulses['alice'][f'bs{storage_mode}'].pulse_parameters['ramp']
-    # if bs_amplitude is None:
-    #     bs_amplitude = bs.amplitude
+
+    bs = qubit_params_module.sb_pulses[alice_or_bob][f"bs{storage_mode}"]
     if bs_amplitude is not None:
-        bs.amplitude=1
+        bs.amplitude = 1
     if bs_range is None:
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
 
+    ch = "SG4" if channel is None else channel
+    lo_name = "SG4_LO" if lo_name is None else lo_name
+    lo = lo_settings["q0"][serial_num][lo_name]
 
-    lo = lo_settings["q0"][serial_num]["SG4_LO"]
-    lo_range = 0.5e9
-    if freq_swp.start < lo - lo_range or freq_swp.stop > lo + lo_range:
-        old_lo = lo
-        new_lo = (freq_swp.start + freq_swp.stop) / 2
-        step = 200e6
-        new_lo = round(new_lo / step) * step        
-        if new_lo < 1e9:
-            new_lo = 0
-        lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
-        lo = new_lo
-        print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
-        lo_change=True
+    lo_range = 500e6  # on either side of the lo
+    lo_min = 1e9
+    step = 200e6
+
+    new_lo = (freq_swp.start + freq_swp.stop) / 2
+    new_lo = round(new_lo / step) * step
+    print(f"Trying new LO frequency: {new_lo/1e9} GHz")
+
+    if new_lo < lo_min:
+        print("Warning: LO frequency is too low. Adjusting to 1 GHz.")
+        new_lo = lo_min
+    if freq_swp.start < new_lo - lo_range or freq_swp.stop > new_lo + lo_range:
+        raise ValueError("Sweep range is outside of the allowed LO range.")
+
+    lo = new_lo
+    lo_settings["q0"][serial_num][lo_name] = lo
+    print(f"Warning: LO ({lo_name}) frequency changed to {lo/1e9} GHz")
+    lo_change = True
+
     freq_swp.start -= lo
     freq_swp.stop -= lo
-
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
@@ -118,7 +122,12 @@ def bs_spectroscopy_with_sb_and_SB_readout(
                 exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
 
             with exp.section(uid="bs", play_after="sb_delay_pre"):
-                exp.play(signal="bs", pulse=bs, length=bs_length, amplitude=bs_amplitude if bs_amplitude is not None else None)
+                exp.play(
+                    signal="bs",
+                    pulse=bs,
+                    length=bs_length,
+                    amplitude=bs_amplitude if bs_amplitude is not None else None,
+                )
 
             with exp.section(uid="sb_delay_post", play_after="bs"):
                 exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
@@ -157,7 +166,6 @@ def bs_spectroscopy_with_sb_and_SB_readout(
         thresholds=thresholds,
     )
 
-    ch = "SG4"
     sig_freq_map[serial_num][ch]["bs"] = {}
     sig_freq_map[serial_num][ch]["bs"]["frequency"] = freq_swp
     sig_freq_map[serial_num][ch]["bs"]["range"] = bs_range

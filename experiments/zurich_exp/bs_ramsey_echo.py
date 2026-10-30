@@ -38,6 +38,8 @@ def bs_ramsey_echo(
     sw_detuning_freq=0,
     reset_delay=None,
     chunk_count=None,
+    channel=None,
+    lo_name=None,
 ):
 
     # Load device and config params
@@ -63,17 +65,26 @@ def bs_ramsey_echo(
     if bs_freq is None:
         bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
 
-    lo = lo_settings["q0"][serial_num]["SG4_LO"]
-    lo_range = 0.5e9
-    if bs_freq < lo - lo_range or bs_freq > lo + lo_range:
-        old_lo = lo
-        new_lo = bs_freq
-        step = 200e6
-        new_lo = round(new_lo / step) * step
-        lo_settings["q0"][serial_num]["SG4_LO"] = new_lo
-        lo = new_lo
-        print(f"Warning: LO frequency changed to {new_lo/1e9} GHz")
-        lo_change = True
+    ch = "SG4" if channel is None else channel
+    lo_name = "SG4_LO" if lo_name is None else lo_name
+    lo = lo_settings["q0"][serial_num][lo_name]
+
+    lo_range = 500e6  # on either side of the lo
+    lo_min = 1e9
+    step = 200e6
+
+    new_lo = bs_freq
+    new_lo = round(new_lo / step) * step
+    print(f"Trying new LO frequency: {new_lo/1e9} GHz")
+
+    if new_lo < lo_min:
+        print("Warning: LO frequency is too low. Adjusting to 1 GHz.")
+        new_lo = lo_min
+
+    lo = new_lo
+    lo_settings["q0"][serial_num][lo_name] = lo
+    print(f"Warning: LO ({lo_name}) frequency changed to {lo/1e9} GHz")
+    lo_change = True
 
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}

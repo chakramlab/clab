@@ -21,6 +21,8 @@ def iq_blobs(
     amplitude=None,
     acquire_delay=None,
     measure_f=False,
+    prepare_buffer=False,
+    alice_or_bob="alice",
 ):
 
     # Load device and config params
@@ -32,19 +34,37 @@ def iq_blobs(
     ge_X180 = qubit_params_module.ge_X180
     ef_X180 = qubit_params_module.ef_X180
 
+    sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
+    sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
+
+    transitions = [f"f{i}g{i+1}" for i in range(1)]
+    sb_drive_lines = {}
+    sb_drive_pulses = {}
+    for transition in transitions:
+        if alice_or_bob == "alice":
+            sb_drive_lines[transition] = f"sb_drive_alice_{transition}"
+        else:
+            sb_drive_lines[transition] = f"sb_drive_bob_{transition}"
+
+    reset_delay = qubit_parameters["q0"]["reset_delay"]
+    cavity_reset_delay = qubit_parameters["q0"]["cavity_reset_delay"]
+
     if frequency is not None:
-        lo = lo_settings["q0"][serial_num]['QA0_LO']
+        lo = lo_settings["q0"][serial_num]["QA0_LO"]
         frequency -= lo
 
     if acquire_delay is not None:
-        assert acquire_delay <= readout_pulse.length, "Acquire delay exceeds readout pulse length"
+        assert (
+            acquire_delay <= readout_pulse.length
+        ), "Acquire delay exceeds readout pulse length"
     else:
-        acquire_delay = qubit_parameters['q0']['acquire_delay']
+        acquire_delay = qubit_parameters["q0"]["acquire_delay"]
 
     if amplitude is not None:
         readout_pulse_length = qubit_params_module.readout_pulse.length
         readout_pulse = pulse_library.const(
-        uid="ro_pulse", length=readout_pulse_length, amplitude=1.0)
+            uid="ro_pulse", length=readout_pulse_length, amplitude=1.0
+        )
 
     # Create Experiment
     exp = Experiment(
@@ -52,6 +72,7 @@ def iq_blobs(
         signals=[
             ExperimentSignal("qb_drive"),
             ExperimentSignal("qb_ef_drive"),
+            *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
         ],
@@ -63,8 +84,32 @@ def iq_blobs(
         acquisition_type=AcquisitionType.INTEGRATION,
         averaging_mode=AveragingMode.SINGLE_SHOT,
     ):
+        # first readout
+        if prepare_buffer:
+            with exp.section(
+                uid="ge_excitation_load_0", play_after=None, on_system_grid=True
+            ):
+                exp.play(signal="qb_drive", pulse=ge_X180)
+            with exp.section(
+                uid="ef_excitation_load_0",
+                play_after="ge_excitation_load_0",
+                on_system_grid=True,
+            ):
+                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+            with exp.section(
+                uid="sb_load_buffer_0",
+                play_after="ef_excitation_load_0",
+                on_system_grid=True,
+            ):
+                exp.play(
+                    signal=sb_drive_lines["f0g1"],
+                    pulse=(sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob),
+                )
+            play_after = "sb_load_buffer_0"
+        else:
+            play_after = None
 
-        with exp.section(uid="readout_g"):
+        with exp.section(uid="readout_g", play_after=play_after):
             exp.measure(
                 measure_signal="measure",
                 measure_pulse=readout_pulse,
@@ -72,12 +117,39 @@ def iq_blobs(
                 acquire_signal="acquire",
                 integration_kernel=kernels,
                 acquire_delay=acquire_delay,
-                integration_length=readout_pulse.length-acquire_delay if acquire_delay is not None else readout_pulse.length,
+                integration_length=(
+                    readout_pulse.length - acquire_delay
+                    if acquire_delay is not None
+                    else readout_pulse.length
+                ),
                 handle="ac_0",
-                reset_delay=qubit_parameters["q0"]["reset_delay"],
+                reset_delay=reset_delay if not prepare_buffer else cavity_reset_delay,
             )
+        play_after = "readout_g"
 
-        with exp.section(uid="qubit_ge_excitation_0", play_after="readout_g"):
+        if prepare_buffer:
+            with exp.section(
+                uid="ge_excitation_load_1", play_after=play_after, on_system_grid=True
+            ):
+                exp.play(signal="qb_drive", pulse=ge_X180)
+            with exp.section(
+                uid="ef_excitation_load_1",
+                play_after="ge_excitation_load_1",
+                on_system_grid=True,
+            ):
+                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+            with exp.section(
+                uid="sb_load_buffer_1",
+                play_after="ef_excitation_load_1",
+                on_system_grid=True,
+            ):
+                exp.play(
+                    signal=sb_drive_lines["f0g1"],
+                    pulse=(sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob),
+                )
+            play_after = "sb_load_buffer_1"
+
+        with exp.section(uid="qubit_ge_excitation_0", play_after=play_after):
             exp.play(signal="qb_drive", pulse=ge_X180)
 
         with exp.section(uid="readout_e", play_after="qubit_ge_excitation_0"):
@@ -88,16 +160,51 @@ def iq_blobs(
                 acquire_signal="acquire",
                 integration_kernel=kernels,
                 acquire_delay=acquire_delay,
-                integration_length=readout_pulse.length-acquire_delay if acquire_delay is not None else readout_pulse.length,
+                integration_length=(
+                    readout_pulse.length - acquire_delay
+                    if acquire_delay is not None
+                    else readout_pulse.length
+                ),
                 handle="ac_1",
-                reset_delay=qubit_parameters["q0"]["reset_delay"],
+                reset_delay=reset_delay if not prepare_buffer else cavity_reset_delay,
             )
+        play_after = "readout_e"
 
         if measure_f:
-            with exp.section(uid="qubit_ge_excitation_1", play_after="readout_e"):
+            if prepare_buffer:
+                with exp.section(
+                    uid="ge_excitation_load_2",
+                    play_after=play_after,
+                    on_system_grid=True,
+                ):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+                with exp.section(
+                    uid="ef_excitation_load_2",
+                    play_after="ge_excitation_load_2",
+                    on_system_grid=True,
+                ):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                with exp.section(
+                    uid="sb_load_buffer_2",
+                    play_after="ef_excitation_load_2",
+                    on_system_grid=True,
+                ):
+                    exp.play(
+                        signal=sb_drive_lines["f0g1"],
+                        pulse=(
+                            sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob
+                        ),
+                    )
+                play_after = "sb_load_buffer_2"
+
+            with exp.section(uid="qubit_ge_excitation_1", play_after=play_after):
                 exp.play(signal="qb_drive", pulse=ge_X180)
 
-            with exp.section(uid="qubit_ef_excitation", play_after="qubit_ge_excitation_1", on_system_grid=True):
+            with exp.section(
+                uid="qubit_ef_excitation",
+                play_after="qubit_ge_excitation_1",
+                on_system_grid=True,
+            ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
 
             with exp.section(uid="readout_f", play_after="qubit_ef_excitation"):
@@ -108,9 +215,15 @@ def iq_blobs(
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     acquire_delay=acquire_delay,
-                    integration_length=readout_pulse.length-acquire_delay if acquire_delay is not None else readout_pulse.length,
+                    integration_length=(
+                        readout_pulse.length - acquire_delay
+                        if acquire_delay is not None
+                        else readout_pulse.length
+                    ),
                     handle="ac_2",
-                    reset_delay=qubit_parameters["q0"]["reset_delay"]*2,
+                    reset_delay=(
+                        reset_delay * 2 if not prepare_buffer else cavity_reset_delay
+                    ),
                 )
 
     # setup calibration and signal map for the experiment
@@ -118,7 +231,11 @@ def iq_blobs(
         exp, serial_num, qubit_parameters, lo_settings
     )
 
-    sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"] = frequency if frequency is not None else sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"]
+    sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"] = (
+        frequency
+        if frequency is not None
+        else sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"]
+    )
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

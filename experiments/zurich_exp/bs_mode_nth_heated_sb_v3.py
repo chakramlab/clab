@@ -29,6 +29,10 @@ def bs_mode_nth_heated_sb_v3(
     bs_swap_range=None,
     bs_swap_length=None,
     bs_swap_amplitude=None,
+    snail_drive_freq=None,
+    snail_drive_length=None,
+    snail_drive_range=None,
+    snail_drive_amplitude=None,
     reset_delay=None,
     acquisition_type=AcquisitionType.INTEGRATION,
     alice_or_bob_heating="alice",
@@ -39,6 +43,9 @@ def bs_mode_nth_heated_sb_v3(
     swap_storage_mode=0,
     heated_storage_mode=0,
     chunk_count=None,
+    measure_2_state=False,
+    snail_drive_LO_name=None,
+    snail_drive_channel_name=None,
 ):
 
     # Load device and config params
@@ -51,6 +58,7 @@ def bs_mode_nth_heated_sb_v3(
     ef_X180 = qubit_params_module.ef_X180
     sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
     sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
+    snail_drive = qubit_params_module.snail_12_by2
 
     # bs pulse (actual resonant one)
     bs_swap = qubit_params_module.sb_pulses[alice_or_bob_swap][f"bs{swap_storage_mode}"]
@@ -89,8 +97,23 @@ def bs_mode_nth_heated_sb_v3(
                 f"Warning: bs_heating_range ({bs_heating_range}) != bs_swap_range ({bs_swap_range})"
             )
 
+    # snail 1-2 by 2
+    if snail_drive_length is None:
+        snail_drive_length = snail_drive.length
+    if snail_drive_amplitude is not None:
+        snail_drive.amplitude = 1
+    if snail_drive_range is None:
+        snail_drive_range = qubit_parameters["q0"][f"snail_12_by2_dBm_range"]
+    if snail_drive_freq is None:
+        snail_drive_freq = qubit_parameters["q0"][f"snail_12_by2_freq"]
+    if snail_drive_LO_name is None:
+        snail_drive_LO_name = "SG4_LO"
+    if snail_drive_channel_name is None:
+        snail_drive_channel_name = "SG4"
+
     lo_heating = lo_settings["q0"][serial_num]["SG2_LO"]
     lo_swap = lo_settings["q0"][serial_num]["SG4_LO"]
+    lo_snail = lo_settings["q0"][serial_num][snail_drive_LO_name]
     lo_range = 0.5e9
     lo_min = 1e9
 
@@ -112,6 +135,56 @@ def bs_mode_nth_heated_sb_v3(
         )
         lo_change = True
 
+    if measure_2_state:
+        lo_name = snail_drive_LO_name
+        if lo_name == "SG4_LO":
+            new_lo = (snail_drive_freq + bs_swap_freq) / 2
+            step = 200e6
+            new_lo = round(new_lo / step) * step
+            if new_lo < lo_min:
+                new_lo = lo_min
+            if (
+                snail_drive_freq < new_lo - lo_range
+                or snail_drive_freq > new_lo + lo_range
+            ):
+                raise ValueError("Snail frequency is outside of the allowed LO range.")
+            if bs_swap_freq < new_lo - lo_range or bs_swap_freq > new_lo + lo_range:
+                raise ValueError("Swap frequency is outside of the allowed LO range.")
+            lo_snail = new_lo
+            lo_swap = new_lo
+            lo_settings["q0"][serial_num][lo_name] = new_lo
+            print(
+                f"Warning: swap and snail LO {lo_name} frequency changed to {new_lo/1e9} GHz"
+            )
+            if snail_drive_range != bs_swap_range:
+                raise ValueError("Snail and swap dbm ranges are not equal.")
+        elif lo_name == "SG2_LO":
+            new_lo = (snail_drive_freq + bs_heating_freq) / 2
+            step = 200e6
+            new_lo = round(new_lo / step) * step
+            if new_lo < lo_min:
+                new_lo = lo_min
+            if (
+                snail_drive_freq < new_lo - lo_range
+                or snail_drive_freq > new_lo + lo_range
+            ):
+                raise ValueError("Snail frequency is outside of the allowed LO range.")
+            if (
+                bs_heating_freq < new_lo - lo_range
+                or bs_heating_freq > new_lo + lo_range
+            ):
+                raise ValueError(
+                    "Heating frequency is outside of the allowed LO range."
+                )
+            lo_snail = new_lo
+            lo_heating = new_lo
+            lo_settings["q0"][serial_num][lo_name] = new_lo
+            print(
+                f"Warning: heating and snail LO {lo_name} frequency changed to {new_lo/1e9} GHz"
+            )
+            if snail_drive_range != bs_heating_range:
+                raise ValueError("Snail and heating dbm ranges are not equal.")
+
     transitions = [f"f{i}g{i+1}" for i in range(max_fock_state)]
     sb_drive_lines = {}
     for transition in transitions:
@@ -131,6 +204,7 @@ def bs_mode_nth_heated_sb_v3(
             *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
             ExperimentSignal("measure"),
             ExperimentSignal("acquire"),
+            ExperimentSignal("snail_12_by2"),
         ],
     )
     with exp.acquire_loop_rt(
@@ -163,8 +237,24 @@ def bs_mode_nth_heated_sb_v3(
                         ),
                     )
 
+                if measure_2_state:
+                    with exp.section(
+                        uid="snail_12_by2", play_after="bs_heating", on_system_grid=True
+                    ):
+                        exp.play(
+                            signal="snail_12_by2",
+                            pulse=snail_drive,
+                            length=snail_drive_length,
+                            amplitude=(
+                                snail_drive_amplitude
+                                if snail_drive_amplitude is not None
+                                else None
+                            ),
+                        )
+                play_after = "snail_12_by2" if measure_2_state else "bs_heating"
+
                 with exp.section(
-                    uid="bs_swap", play_after="bs_heating", on_system_grid=True
+                    uid="bs_swap", play_after=play_after, on_system_grid=True
                 ):
                     exp.play(
                         signal="bs_swap",
@@ -226,9 +316,8 @@ def bs_mode_nth_heated_sb_v3(
                         integration_kernel=kernels,
                         handle="ac_0",
                         reset_delay=(
-                            reset_delay
-                            if reset_delay is not None
-                            else qubit_parameters["q0"]["cavity_reset_delay"]
+                            4e-3 / 500e-6 * bs_heating_swp_param
+                            + qubit_parameters["q0"]["cavity_reset_delay"]
                         ),
                         acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                     )
@@ -257,7 +346,15 @@ def bs_mode_nth_heated_sb_v3(
     )
     sig_freq_map[serial_num][ch]["bs_heating"]["range"] = bs_heating_range
 
-    print(f"lo_swap: {lo_swap}, lo_heating: {lo_heating}")
+    lo_snail = lo_settings["q0"][serial_num][snail_drive_LO_name]
+    ch = snail_drive_channel_name
+    sig_freq_map[serial_num][ch]["snail_12_by2"] = {}
+    sig_freq_map[serial_num][ch]["snail_12_by2"]["frequency"] = (
+        snail_drive_freq - lo_snail
+    )
+    sig_freq_map[serial_num][ch]["snail_12_by2"]["range"] = snail_drive_range
+
+    print(f"lo_swap: {lo_swap}, lo_heating: {lo_heating}, lo_snail: {lo_snail}")
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

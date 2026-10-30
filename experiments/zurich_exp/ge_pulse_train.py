@@ -1,4 +1,10 @@
-from laboneq.simple import AcquisitionType, Experiment, ExperimentSignal
+from laboneq.simple import (
+    AcquisitionType,
+    AveragingMode,
+    Experiment,
+    ExperimentSignal,
+    LinearSweepParameter,
+)
 
 from .calib_settings import create_default_map_and_calibration
 from .laboneq_helper import default_signal_map_and_calibration
@@ -12,10 +18,11 @@ def ge_pulse_train(
     exp_id="ge_pulse_train",
     average_exponent=5,  # 2^n averages
     swp_param=None,  # Expecting a SweepParameter tracking integer pulse counts
-    qb_drive_freq=None,
-    qb_drive_amplitude=None,
+    freq_sweep=None,
+    amp_sweep=None,
     qb_drive_length=None,
     acquisition_type=AcquisitionType.INTEGRATION,
+    averaging_mode=AveragingMode.CYCLIC,
     rotate_ro=False,
     thresholds=None,
     chunk_count=1,
@@ -42,56 +49,76 @@ def ge_pulse_train(
         ],
     )
 
-    if qb_drive_amplitude is not None:
-        ge_X180.amplitude = 1
+    qb_drive_freq = qubit_parameters["q0"]["qb_freq"]
+    qb_drive_amplitude = ge_X180.amplitude
     if qb_drive_length is None:
         qb_drive_length = qubit_parameters["q0"]["qb_pi_len"]
-    if qb_drive_freq is None:
-        qb_drive_freq = qubit_parameters["q0"]["qb_freq"]
+
+    if freq_sweep is None:
+        freq_sweep = LinearSweepParameter("freq_sweep", qb_drive_freq, qb_drive_freq, 1)
+
+    ge_X180.amplitude = 1
+    if amp_sweep is None:
+        amp_sweep = LinearSweepParameter(
+            "amp_sweep", qb_drive_amplitude, qb_drive_amplitude, 1
+        )
 
     with exp.acquire_loop_rt(
-        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
+        uid="shots",
+        count=pow(2, average_exponent),
+        acquisition_type=acquisition_type,
+        averaging_mode=averaging_mode,
     ):
 
         with exp.sweep(
-            uid="pulse_count_sweep",
-            parameter=swp_param,
+            uid="freq_sweep",
+            parameter=freq_sweep,
             reset_oscillator_phase=True,
             chunk_count=chunk_count,
         ):
+            with exp.sweep(
+                uid="amp_sweep",
+                parameter=amp_sweep,
+                reset_oscillator_phase=True,
+                chunk_count=chunk_count,
+            ):
 
-            with exp.section(uid="ge_excitation", play_after=None, on_system_grid=True):
-                with exp.match(sweep_parameter=swp_param):
-                    for n in swp_param.values:
-                        n_int = int(n)
-                        with exp.case(n_int):
-                            for _ in range(n_int):
-                                exp.play(
-                                    signal=qb_drive_signal,
-                                    pulse=ge_X180,
-                                    length=qb_drive_length,
-                                    amplitude=(
-                                        qb_drive_amplitude
-                                        if qb_drive_amplitude is not None
-                                        else None
-                                    ),
-                                )
-                                (
-                                    exp.delay(signal=qb_drive_signal, time=pulse_delay)
-                                    if _ < n_int - 1
-                                    else None
-                                )
+                with exp.sweep(
+                    uid="pulse_count_sweep",
+                    parameter=swp_param,
+                    reset_oscillator_phase=True,
+                    chunk_count=chunk_count,
+                ):
 
-            with exp.section(uid="readout", play_after="ge_excitation"):
-                exp.measure(
-                    measure_signal="measure",
-                    measure_pulse=readout_pulse,
-                    acquire_signal="acquire",
-                    integration_kernel=kernels,
-                    handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["reset_delay"],
-                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
-                )
+                    with exp.section(
+                        uid="ge_excitation", play_after=None, on_system_grid=True
+                    ):
+                        with exp.match(sweep_parameter=swp_param):
+                            for n in swp_param.values:
+                                n_int = int(n)
+                                with exp.case(n_int):
+                                    for _ in range(n_int):
+                                        exp.play(
+                                            signal=qb_drive_signal,
+                                            pulse=ge_X180,
+                                            length=qb_drive_length,
+                                            amplitude=amp_sweep,
+                                        )
+                                        if _ < n_int - 1:
+                                            exp.delay(
+                                                signal=qb_drive_signal, time=pulse_delay
+                                            )
+
+                    with exp.section(uid="readout", play_after="ge_excitation"):
+                        exp.measure(
+                            measure_signal="measure",
+                            measure_pulse=readout_pulse,
+                            acquire_signal="acquire",
+                            integration_kernel=kernels,
+                            handle="ac_0",
+                            reset_delay=qubit_parameters["q0"]["reset_delay"],
+                            acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                        )
 
     # setup calibration and signal map for the experiment
     sig_freq_map = create_default_map_and_calibration(
@@ -103,10 +130,9 @@ def ge_pulse_train(
         thresholds=thresholds,
     )
 
-    if qb_drive_freq is not None:
-        sig_freq_map[serial_num]["SG0"][qb_drive_signal]["frequency"] = (
-            qb_drive_freq - lo_settings["q0"][serial_num]["SG0_LO"]
-        )
+    sig_freq_map[serial_num]["SG0"][qb_drive_signal]["frequency"] = (
+        freq_sweep - lo_settings["q0"][serial_num]["SG0_LO"]
+    )
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

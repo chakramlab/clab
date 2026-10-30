@@ -28,7 +28,9 @@ def resonator_spectroscopy_cw(
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
     qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
 
-    lo = lo_settings["q0"][serial_num]['QA0_LO']
+    readout_pulse = qubit_params_module.readout_pulse
+
+    lo = lo_settings["q0"][serial_num]["QA0_LO"]
     freq_swp.start -= lo
     freq_swp.stop -= lo
 
@@ -51,7 +53,7 @@ def resonator_spectroscopy_cw(
                     acquire_signal="acquire",
                     integration_length=integration_time,
                     handle="ac_0",
-                    # measure_pulse = readout_pulse,
+                    measure_pulse=readout_pulse,
                 )
                 # exp.measure(measure_signal = "measure", measure_pulse = readout_pulse,
                 # acquire_signal = "acquire", integration_kernel = kernels, handle = "ac_0",
@@ -63,7 +65,9 @@ def resonator_spectroscopy_cw(
                 exp.reserve(signal="acquire")
 
     # setup calibration and signal map for the experiment
-    sig_freq_map = create_default_map_and_calibration(exp, serial_num, qubit_parameters, lo_settings)
+    sig_freq_map = create_default_map_and_calibration(
+        exp, serial_num, qubit_parameters, lo_settings
+    )
     # update the frequency to incorporate the frequency sweep
     sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"] = freq_swp
 

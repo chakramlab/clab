@@ -145,7 +145,31 @@ def save_calibrated_data(data_path, file_name, data, config=None):
             zpts = data.get("zpts", None)
             if zpts is not None:
                 f.create_dataset("zpts", data=zpts)
+        if "I_extra_rot" in data:
+            I_extra_rot = data.get("I_extra_rot", None)
+            if I_extra_rot is not None:
+                f.create_dataset("I_extra_rot", data=I_extra_rot)
+        if "Q_extra_rot" in data:
+            Q_extra_rot = data.get("Q_extra_rot", None)
+            if Q_extra_rot is not None:
+                f.create_dataset("Q_extra_rot", data=Q_extra_rot)
+        if "P_e_extra" in data:
+            P_e_extra = data.get("P_e_extra", None)
+            if P_e_extra is not None:
+                f.create_dataset("P_e_extra", data=P_e_extra)
 
+        if config:
+            f.attrs["config"] = json.dumps(config)
+
+    print("File saved at", file_path)
+
+
+def save_calibrated_data_ss_prathu(data_path, file_name, data, config=None):
+    file_path = os.path.join(data_path, get_next_filename(data_path, file_name, "h5"))
+    with h5py.File(file_path, "w") as f:
+        for key, value in data.items():
+            if value is not None:
+                f.create_dataset(key, data=value)
         if config:
             f.attrs["config"] = json.dumps(config)
 
@@ -599,20 +623,37 @@ def load_kernels_and_thresholds_from_csv(filepath, tag=None):
     states = ["g", "e", "f"]
     kernels = []
     if data_from_csv.ndim == 1:
-        kernels.append(
-            pulse_library.PulseSampledComplex(
-                uid=f"kernel_{states[0]}", samples=data_from_csv.astype(np.complex128)
+        try:
+            kernels.append(
+                pulse_library.PulseSampledComplex(
+                    uid=f"kernel_{states[0]}",
+                    samples=data_from_csv.astype(np.complex128),
+                )
             )
-        )
+        except AttributeError:
+            kernels.append(
+                pulse_library.PulseSampled(
+                    uid=f"kernel_{states[0]}",
+                    samples=data_from_csv.astype(np.complex128),
+                )
+            )
         thresholds = [np.float64(thresholds)]
     else:
         for i in range(len(data_from_csv)):
-            kernels.append(
-                pulse_library.PulseSampledComplex(
-                    uid=f"kernel_{states[i]}",
-                    samples=data_from_csv[i].astype(np.complex128),
+            try:
+                kernels.append(
+                    pulse_library.PulseSampledComplex(
+                        uid=f"kernel_{states[i]}",
+                        samples=data_from_csv[i].astype(np.complex128),
+                    )
                 )
-            )
+            except AttributeError:
+                kernels.append(
+                    pulse_library.PulseSampled(
+                        uid=f"kernel_{states[i]}",
+                        samples=data_from_csv[i].astype(np.complex128),
+                    )
+                )
         thresholds = [np.float64(_) for _ in thresholds]
     return kernels, thresholds
 

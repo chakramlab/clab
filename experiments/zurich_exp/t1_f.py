@@ -1,5 +1,6 @@
 from laboneq.simple import (
     AcquisitionType,
+    AveragingMode,
     Experiment,
     ExperimentSignal,
     LinearSweepParameter,
@@ -20,6 +21,7 @@ def t1_f(
         uid="time_swp_param", start=8e-9, stop=10e-6, count=101
     ),
     acquisiiton_type=AcquisitionType.INTEGRATION,
+    averaging_mode=AveragingMode.CYCLIC,
     rotate_ro=False,
     thresholds=None,
 ):
@@ -46,15 +48,20 @@ def t1_f(
     # ge_X180_sq = pulse_library.const(uid="ge_X180_pulse_sq", length=ge_X180.length, amplitude= ge_X180.amplitude, can_compress=True)
 
     with exp.acquire_loop_rt(
-        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisiiton_type
+        uid="shots",
+        count=pow(2, average_exponent),
+        acquisition_type=acquisiiton_type,
+        averaging_mode=averaging_mode,
     ):
         with exp.sweep(
             uid="time_sweep", parameter=time_swp, reset_oscillator_phase=True
         ):
             with exp.section(uid="qubit_excitation"):
                 exp.play(signal="qb_drive", pulse=ge_X180)
-            with exp.section(uid = "ef_excitation", play_after= "qubit_excitation", on_system_grid=True):
-                exp.play(signal = "qb_ef_drive", pulse = ef_X180)
+            with exp.section(
+                uid="ef_excitation", play_after="qubit_excitation", on_system_grid=True
+            ):
+                exp.play(signal="qb_ef_drive", pulse=ef_X180)
                 exp.delay(signal="qb_ef_drive", time=time_swp)
             with exp.section(uid="readout", play_after="ef_excitation"):
                 exp.measure(
@@ -64,6 +71,7 @@ def t1_f(
                     integration_kernel=kernels,
                     handle="ac_0",
                     reset_delay=qubit_parameters["q0"]["reset_delay"],
+                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
     # setup calibration and signal map for the experiment

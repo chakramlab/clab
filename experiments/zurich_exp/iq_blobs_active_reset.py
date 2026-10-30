@@ -82,7 +82,10 @@ def iq_blobs_active_reset(
                 handle=f"ac_active_reset_{i}",
             ):
                 with exp.case(0):
-                    exp.play(signal="qb_drive", pulse=ge_X180, amplitude=0.0)
+                    # exp.play(
+                    # signal="qb_drive", pulse=ge_X180, amplitude=0.0, length=0.0
+                    # )
+                    pass
                 with exp.case(1):
                     exp.play(signal="qb_drive", pulse=ge_X180)
 

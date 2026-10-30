@@ -1,5 +1,6 @@
 from laboneq.simple import (
     AcquisitionType,
+    AveragingMode,
     Experiment,
     ExperimentSignal,
     LinearSweepParameter,
@@ -22,13 +23,15 @@ def rabi_ef(
         uid="sweep_param", start=40e-9, stop=400e-9, count=11
     ),
     acquisition_type=AcquisitionType.INTEGRATION,
+    averaging_mode=AveragingMode.CYCLIC,
     amplitude_rabi=False,
     time_rabi=False,
     rotate_ro=False,
     thresholds=None,
     pulse_type="const",  # "const" or "gaussian"
     play_ge=True,  # Whether to play the ge transition pulse
-    play_fe=False,  # Whether to play the fe transition pulse at the end
+    play_fe=False,  # Whether to play the fe transition pulse at the end (off for single shot)
+    play_eg=False,  # Whether to play the eg transition pulse at the end (off for single shot)
     chunk_count=1,
 ):
 
@@ -57,15 +60,17 @@ def rabi_ef(
             "Please select either time_rabi or amplitude_rabi to be True and the other to be False."
         )
 
-
-
     with exp.acquire_loop_rt(
         uid="shots",
         count=pow(2, average_exponent),
         acquisition_type=acquisition_type,
+        averaging_mode=averaging_mode,
     ):
         with exp.sweep(
-            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True, chunk_count=chunk_count
+            uid="time_or_amp_sweep",
+            parameter=swp_param,
+            reset_oscillator_phase=True,
+            chunk_count=chunk_count,
         ):
             if play_ge:
                 with exp.section(uid="ge_transition", alignment=SectionAlignment.RIGHT):
@@ -82,18 +87,22 @@ def rabi_ef(
                 if time_rabi:
                     exp.play(signal="qb_ef_drive", pulse=ef_X180, length=swp_param)
                 elif amplitude_rabi:
-                    exp.play(
-                        signal="qb_ef_drive", pulse=ef_X180, amplitude=swp_param
-                    )
-            with exp.section(uid="eg_transition", play_after="ef_transition", on_system_grid=True):
-                exp.play(signal="qb_drive", pulse=ge_X180)
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180, amplitude=swp_param)
+            play_after = "ef_transition"
+
+            if play_eg:
+                with exp.section(
+                    uid="eg_transition", play_after="ef_transition", on_system_grid=True
+                ):
+                    exp.play(signal="qb_drive", pulse=ge_X180)
+                play_after = "eg_transition"
 
             if play_fe:
-                with exp.section(uid="fe_transition", play_after="eg_transition", on_system_grid=True):
+                with exp.section(
+                    uid="fe_transition", play_after="eg_transition", on_system_grid=True
+                ):
                     exp.play(signal="qb_ef_drive", pulse=ef_X180)
                 play_after = "fe_transition"
-            else:
-                play_after = "eg_transition"
 
             with exp.section(uid="readout", play_after=play_after, on_system_grid=True):
                 exp.measure(
@@ -102,7 +111,7 @@ def rabi_ef(
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay= 2 * qubit_parameters["q0"]["reset_delay"],
+                    reset_delay=2 * qubit_parameters["q0"]["reset_delay"],
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
