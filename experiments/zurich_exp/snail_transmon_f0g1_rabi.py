@@ -26,6 +26,9 @@ def snail_transmon_f0g1_rabi(
     averaging_mode=AveragingMode.CYCLIC,
     prepare_e=True,
     sideband_on=True,
+    sideband_pulse=None,
+    sb_freq=None,
+    sb_range=None,
 ):
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
@@ -33,8 +36,12 @@ def snail_transmon_f0g1_rabi(
     readout_pulse = qubit_params_module.readout_pulse
     kernels = qubit_params_module.acquire_kernel
     ge_X180 = qubit_params_module.ge_X180
-    sideband_pulse = qubit_params_module.sb_snail_transmon_f0g1
-    sb_freq = qubit_parameters["q0"]["sb_snail_transmon_f0g1_freq"]
+    if sideband_pulse is None:
+        sideband_pulse = qubit_params_module.sb_snail_transmon_f0g1
+    if sb_freq is None:
+        sb_freq = qubit_parameters["q0"]["sb_snail_transmon_f0g1_freq"]
+    if sb_range is None:
+        sb_range = qubit_parameters["q0"]["sb_snail_transmon_f0g1_dBm_range"]
 
     lo = max(1e9, round(sb_freq / 200e6) * 200e6)
     lo_settings["q0"][serial_num]["SG4_LO"] = lo
@@ -92,10 +99,15 @@ def snail_transmon_f0g1_rabi(
         rotate_ro=rotate_ro,
         thresholds=thresholds,
     )
+    # sig_freq_map[serial_num]["SG4"]["snail_sideband"] = {
+    #     "frequency": sb_freq - lo,
+    #     "range": qubit_parameters["q0"]["sb_snail_transmon_f0g1_dBm_range"],
+    # }
     sig_freq_map[serial_num]["SG4"]["snail_sideband"] = {
         "frequency": sb_freq - lo,
-        "range": qubit_parameters["q0"]["sb_snail_transmon_f0g1_dBm_range"],
+        "range": sb_range,
     }
+
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,
         {
