@@ -23,12 +23,17 @@ def iq_blobs(
     measure_f=False,
     prepare_buffer=False,
     alice_or_bob="alice",
+    ss_params=False,
 ):
 
     # Load device and config params
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
-    readout_pulse = qubit_params_module.readout_pulse
+    readout_pulse = (
+        qubit_params_module.readout_pulse
+        if not ss_params
+        else qubit_params_module.readout_pulse_ss
+    )
     qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
     kernels = qubit_params_module.acquire_kernel
     ge_X180 = qubit_params_module.ge_X180
@@ -61,7 +66,11 @@ def iq_blobs(
         acquire_delay = qubit_parameters["q0"]["acquire_delay"]
 
     if amplitude is not None:
-        readout_pulse_length = qubit_params_module.readout_pulse.length
+        readout_pulse_length = (
+            qubit_params_module.readout_pulse.length
+            if not ss_params
+            else qubit_params_module.readout_pulse_ss.length
+        )
         readout_pulse = pulse_library.const(
             uid="ro_pulse", length=readout_pulse_length, amplitude=1.0
         )
@@ -228,14 +237,11 @@ def iq_blobs(
 
     # setup calibration and signal map for the experiment
     sig_freq_map = create_default_map_and_calibration(
-        exp, serial_num, qubit_parameters, lo_settings
+        exp, serial_num, qubit_parameters, lo_settings, single_shot=ss_params
     )
 
-    sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"] = (
-        frequency
-        if frequency is not None
-        else sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"]
-    )
+    if frequency is not None:
+        sig_freq_map[serial_num]["QA0"]["measure/acquire"]["frequency"] = frequency
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

@@ -1,5 +1,6 @@
 from laboneq.simple import (
     AcquisitionType,
+    AveragingMode,
     Experiment,
     ExperimentSignal,
     LinearSweepParameter,
@@ -24,6 +25,7 @@ def bs_rabi_with_sb_and_SB_readout(
     bs_freq=None,
     bs_range=None,
     bs_length=None,
+    bs_ramp=None,
     bs_amplitude=None,
     reset_delay=None,
     acquisition_type=AcquisitionType.INTEGRATION,
@@ -36,6 +38,9 @@ def bs_rabi_with_sb_and_SB_readout(
     sb_delay=0,
     channel=None,
     lo_name=None,
+    single_shot=False,
+    three_state=False,
+    chunk_count=1,
 ):
 
     # Load device and config params
@@ -58,6 +63,8 @@ def bs_rabi_with_sb_and_SB_readout(
         bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
     if bs_freq is None:
         bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
+    if bs_ramp is not None:
+        bs.pulse_parameters["ramp"] = bs_ramp
 
     ch = "SG4" if channel is None else channel
     lo_name = "SG4_LO" if lo_name is None else lo_name
@@ -120,14 +127,20 @@ def bs_rabi_with_sb_and_SB_readout(
             ExperimentSignal("acquire"),
         ],
     )
+
+    averaging_mode = AveragingMode.SINGLE_SHOT if single_shot else AveragingMode.CYCLIC
     with exp.acquire_loop_rt(
-        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
+        uid="shots",
+        count=pow(2, average_exponent),
+        acquisition_type=acquisition_type,
+        averaging_mode=averaging_mode,
     ):
 
         with exp.sweep(
             uid="time_or_amp_sweep",
             parameter=swp_param,
             reset_oscillator_phase=True,
+            chunk_count=chunk_count,
         ):
 
             with exp.section(uid="ge_excitation", play_after=None, on_system_grid=True):
@@ -198,6 +211,7 @@ def bs_rabi_with_sb_and_SB_readout(
         lo_settings,
         rotate_ro=rotate_ro,
         thresholds=thresholds,
+        single_shot=three_state if single_shot else False,
     )
 
     sig_freq_map[serial_num][ch]["bs"] = {}

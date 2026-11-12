@@ -24,6 +24,7 @@ def t1_f(
     averaging_mode=AveragingMode.CYCLIC,
     rotate_ro=False,
     thresholds=None,
+    play_fe=True,
 ):
 
     # Load device and config params
@@ -63,6 +64,7 @@ def t1_f(
             ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
                 exp.delay(signal="qb_ef_drive", time=time_swp)
+                exp.play(signal="qb_ef_drive", pulse=ef_X180) if play_fe else None
             with exp.section(uid="readout", play_after="ef_excitation"):
                 exp.measure(
                     measure_signal="measure",

@@ -40,6 +40,7 @@ def sideband_rabi(
     average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17
     max_fock_state=1,  ## only works for 1 now
     swp_param=LinearSweepParameter(uid="swp_param", start=1e-9, stop=10e-6, count=6),
+    sb_ramp=None,
     sb_length=None,
     sb_range=None,
     sb_amplitude=None,
@@ -79,6 +80,11 @@ def sideband_rabi(
         sb_length = (
             sb_f0g1_alice.length if alice_or_bob == "alice" else sb_f0g1_bob.length
         )
+    if sb_ramp is not None:
+        if alice_or_bob == "alice":
+            sb_f0g1_alice.pulse_parameters["ramp"] = sb_ramp
+        else:
+            sb_f0g1_bob.pulse_parameters["ramp"] = sb_ramp
     if sb_amplitude is not None:
         if alice_or_bob == "alice":
             sb_f0g1_alice.amplitude = 1

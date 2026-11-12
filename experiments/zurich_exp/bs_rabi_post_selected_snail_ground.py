@@ -43,6 +43,10 @@ def bs_rabi_post_selected_snail_ground(
     temp_dump=True,
     temp_dump_storage_mode=2,
     snail_drive=False,
+    three_state=False,
+    chunk_count=1,
+    snail_buffer_swap=False,
+    snail_buffer="alice",
 ):
 
     # Load device and config params
@@ -55,6 +59,7 @@ def bs_rabi_post_selected_snail_ground(
     ef_X180 = qubit_params_module.ef_X180
 
     sb_f0g1 = qubit_params_module.sb_pulses[rabi_buffer]["f0g1"]
+    sb_f0g1_snail_buffer = qubit_params_module.sb_pulses[snail_buffer]["f0g1"]
 
     # bs rabi
     bs_rabi_pulse = qubit_params_module.sb_pulses[rabi_buffer][f"bs{storage_mode}"]
@@ -80,6 +85,11 @@ def bs_rabi_post_selected_snail_ground(
     snail_drive_freq = qubit_parameters["q0"]["snail_12_by2_freq"]
     snail_drive_range = qubit_parameters["q0"]["snail_12_by2_dBm_range"]
 
+    # snail buffer bs
+    bs_snail_buffer_pulse = qubit_params_module.sb_pulses[snail_buffer]["bs0"]
+    bs_snail_buffer_freq = qubit_parameters["q0"][f"bs_{snail_buffer}_freqs"][0]
+    bs_snail_buffer_range = qubit_parameters["q0"][f"bs_{snail_buffer}_dBm_ranges"][0]
+
     if bs_length is None:
         bs_length = bs_rabi_pulse.length
     if bs_amplitude is not None:
@@ -97,6 +107,7 @@ def bs_rabi_post_selected_snail_ground(
 
     lo_bs_rabi = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_bs_ST = lo_settings["q0"][serial_num]["SG2_LO"]
+    lo_bs_snail_buffer = lo_settings["q0"][serial_num]["SG2_LO"]
     lo_snail = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_temp_dump = lo_settings["q0"][serial_num]["SG4_LO"]
     lo_range = 0.5e9
@@ -111,9 +122,10 @@ def bs_rabi_post_selected_snail_ground(
         new_lo = lo_min
     lo_settings["q0"][serial_num][lo_name] = new_lo
     print(
-        f"Warning: bs transmon snail LO ({lo_name}) frequency changed to {new_lo/1e9} GHz"
+        f"Warning: bs transmon snail and snail buffer LO ({lo_name}) frequency changed to {new_lo/1e9} GHz"
     )
     lo_bs_ST = new_lo
+    lo_bs_snail_buffer = new_lo
 
     # bs rabi and snail drive and temp dump lo
     lo_name = "SG4_LO"
@@ -130,7 +142,7 @@ def bs_rabi_post_selected_snail_ground(
         )
     lo_settings["q0"][serial_num][lo_name] = new_lo
     print(
-        f"Warning: bs transmon snail and snail drive LO and temp dump ({lo_name}) frequency changed to {new_lo/1e9} GHz"
+        f"Warning: bs rabi and snail drive and temp dump LO ({lo_name}) frequency changed to {new_lo/1e9} GHz"
     )
     lo_bs_rabi = new_lo
     lo_snail = new_lo
@@ -149,20 +161,23 @@ def bs_rabi_post_selected_snail_ground(
         sb_drive_lines_rabi[transition] = f"sb_drive_{rabi_buffer}_{transition}"
 
     # Create Experiment
-    exp = Experiment(
-        uid=exp_id,
-        signals=[
-            ExperimentSignal("qb_drive"),
-            ExperimentSignal("qb_ef_drive"),
-            ExperimentSignal("bs_rabi"),
-            ExperimentSignal("bs_temp_dump"),
-            ExperimentSignal("bs_ST"),
-            ExperimentSignal("snail_drive"),
-            *[ExperimentSignal(sb_drive_lines_rabi[_]) for _ in transitions],
-            ExperimentSignal("measure"),
-            ExperimentSignal("acquire"),
-        ],
-    )
+    signals = [
+        ExperimentSignal("qb_drive"),
+        ExperimentSignal("qb_ef_drive"),
+        ExperimentSignal("bs_rabi"),
+        ExperimentSignal("bs_temp_dump"),
+        ExperimentSignal("snail_drive"),
+        *[ExperimentSignal(sb_drive_lines_rabi[_]) for _ in transitions],
+        ExperimentSignal("measure"),
+        ExperimentSignal("acquire"),
+    ]
+    if snail_transmon_bs:
+        signals.append(ExperimentSignal("bs_ST"))
+    if snail_buffer_swap:
+        signals.append(ExperimentSignal("snail_buffer"))
+        signals.append(ExperimentSignal(f"sb_drive_{snail_buffer}_f0g1"))
+    exp = Experiment(uid=exp_id, signals=signals)
+
     with exp.acquire_loop_rt(
         uid="shots",
         count=pow(2, average_exponent),
@@ -173,24 +188,27 @@ def bs_rabi_post_selected_snail_ground(
             uid="time_or_amp_sweep",
             parameter=swp_param,
             reset_oscillator_phase=True,
+            chunk_count=chunk_count,
         ):
             # Initial excitation to transmon e, then f, then to rabi buffer
             with exp.section(uid="ge_excitation", play_after=None, on_system_grid=True):
                 exp.play(signal="qb_drive", pulse=ge_X180)
+            play_after = "ge_excitation"
 
             with exp.section(
-                uid="ef_excitation", play_after="ge_excitation", on_system_grid=True
+                uid="ef_excitation", play_after=play_after, on_system_grid=True
             ):
                 exp.play(signal="qb_ef_drive", pulse=ef_X180)
+            play_after = "ef_excitation"
 
             with exp.section(
                 uid="sb_load_rabi_buffer",
-                play_after="ef_excitation",
+                play_after=play_after,
                 on_system_grid=True,
             ):
                 exp.play(signal=sb_drive_lines_rabi["f0g1"], pulse=sb_f0g1)
                 exp.delay(signal=sb_drive_lines_rabi["f0g1"], time=sb_delay)
-                play_after = "sb_load_rabi_buffer"
+            play_after = "sb_load_rabi_buffer"
 
             # Rabi sweep
             with exp.section(uid="bs_rabi", play_after=play_after, on_system_grid=True):
@@ -222,6 +240,37 @@ def bs_rabi_post_selected_snail_ground(
                     exp.play(signal="bs_ST", pulse=bs_ST_pulse)
 
                 play_after = "bs_ST"
+
+            if snail_buffer_swap:
+                # move snail to buffer
+                with exp.section(
+                    uid="snail_buffer", play_after=play_after, on_system_grid=True
+                ):
+                    exp.play(
+                        signal="snail_buffer",
+                        pulse=bs_snail_buffer_pulse,
+                    )
+                play_after = "snail_buffer"
+
+                with exp.section(
+                    uid="sb_unload_snail_buffer",
+                    play_after=play_after,
+                    on_system_grid=True,
+                ):
+                    exp.play(
+                        signal=f"sb_drive_{snail_buffer}_f0g1",
+                        pulse=sb_f0g1_snail_buffer,
+                    )
+                    exp.delay(signal=f"sb_drive_{snail_buffer}_f0g1", time=sb_delay)
+                play_after = "sb_unload_snail_buffer"
+
+                with exp.section(
+                    uid="fe_snail_buffer",
+                    play_after=play_after,
+                    on_system_grid=True,
+                ):
+                    exp.play(signal="qb_ef_drive", pulse=ef_X180)
+                play_after = "fe_snail_buffer"
 
             if measure_transmon:
                 # 2. Measure transmon
@@ -285,6 +334,11 @@ def bs_rabi_post_selected_snail_ground(
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
+    # set readout parameters for 2 state or 3 state single shot
+    # (single_shot = True for 3 state, single_shot = False for 2 state. not the best syntax)
+    # (it's single shot no matter what obviously)
+    single_shot = three_state
+
     # setup calibration and signal map for the experiment
     sig_freq_map = create_default_map_and_calibration(
         exp,
@@ -293,6 +347,7 @@ def bs_rabi_post_selected_snail_ground(
         lo_settings,
         rotate_ro=rotate_ro,
         thresholds=thresholds,
+        single_shot=single_shot,
     )
 
     ch = "SG4"
@@ -313,13 +368,24 @@ def bs_rabi_post_selected_snail_ground(
     sig_freq_map[serial_num][ch]["snail_drive"]["range"] = snail_drive_range
 
     ch = "SG3"
-    sig_freq_map[serial_num][ch]["bs_ST"] = {}
-    sig_freq_map[serial_num][ch]["bs_ST"]["frequency"] = bs_ST_freq - lo_bs_ST
-    sig_freq_map[serial_num][ch]["bs_ST"]["range"] = bs_ST_range
+    if snail_transmon_bs:
+        sig_freq_map[serial_num][ch]["bs_ST"] = {}
+        sig_freq_map[serial_num][ch]["bs_ST"]["frequency"] = bs_ST_freq - lo_bs_ST
+        sig_freq_map[serial_num][ch]["bs_ST"]["range"] = bs_ST_range
+
+    if snail_buffer_swap:
+        sig_freq_map[serial_num][ch]["snail_buffer"] = {}
+        sig_freq_map[serial_num][ch]["snail_buffer"]["frequency"] = (
+            bs_snail_buffer_freq - lo_bs_snail_buffer
+        )
+        sig_freq_map[serial_num][ch]["snail_buffer"]["range"] = bs_snail_buffer_range
 
     print(f"lo_bs_rabi: {lo_bs_rabi}, lo_bs_ST: {lo_bs_ST}, lo_snail: {lo_snail}")
     print(f"bs_rabi map: {sig_freq_map[serial_num]["SG4"]['bs_rabi']}")
-    print(f"bs_ST map: {sig_freq_map[serial_num]["SG3"]['bs_ST']}")
+    if snail_transmon_bs:
+        print(f"bs_ST map: {sig_freq_map[serial_num]["SG3"]['bs_ST']}")
+    if snail_buffer_swap:
+        print(f"snail buffer map: {sig_freq_map[serial_num]["SG3"]['snail_buffer']}")
     print(f"snail drive map: {sig_freq_map[serial_num]["SG4"]['snail_drive']}")
     print(f"temp dump map: {sig_freq_map[serial_num]["SG4"]['bs_temp_dump']}\n")
 

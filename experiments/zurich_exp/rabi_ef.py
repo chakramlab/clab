@@ -23,7 +23,7 @@ def rabi_ef(
         uid="sweep_param", start=40e-9, stop=400e-9, count=11
     ),
     acquisition_type=AcquisitionType.INTEGRATION,
-    averaging_mode=AveragingMode.CYCLIC,
+    single_shot=False,
     amplitude_rabi=False,
     time_rabi=False,
     rotate_ro=False,
@@ -38,7 +38,11 @@ def rabi_ef(
     # Load device and config params
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
-    readout_pulse = qubit_params_module.readout_pulse
+    readout_pulse = (
+        qubit_params_module.readout_pulse
+        if not single_shot
+        else qubit_params_module.readout_pulse_ss
+    )
     qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
     kernels = qubit_params_module.acquire_kernel
     ef_X180 = qubit_params_module.ef_X180
@@ -64,7 +68,9 @@ def rabi_ef(
         uid="shots",
         count=pow(2, average_exponent),
         acquisition_type=acquisition_type,
-        averaging_mode=averaging_mode,
+        averaging_mode=(
+            AveragingMode.SINGLE_SHOT if single_shot else AveragingMode.CYCLIC
+        ),
     ):
         with exp.sweep(
             uid="time_or_amp_sweep",
@@ -123,6 +129,7 @@ def rabi_ef(
         lo_settings,
         rotate_ro=rotate_ro,
         thresholds=thresholds,
+        single_shot=single_shot,
     )
     exp_calibration, map_q0 = default_signal_map_and_calibration(
         sig_freq_map,

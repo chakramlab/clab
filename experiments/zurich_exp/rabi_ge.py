@@ -1,4 +1,9 @@
-from laboneq.simple import Experiment, ExperimentSignal, LinearSweepParameter
+from laboneq.simple import (
+    AveragingMode,
+    Experiment,
+    ExperimentSignal,
+    LinearSweepParameter,
+)
 
 from .calib_settings import create_default_map_and_calibration
 from .laboneq_helper import default_signal_map_and_calibration
@@ -27,12 +32,17 @@ def rabi_ge(
     length=None,
     resolved=False,
     chi=False,
+    single_shot=False,
 ):
 
     # Load device and config params
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
-    readout_pulse = qubit_params_module.readout_pulse
+    readout_pulse = (
+        qubit_params_module.readout_pulse
+        if not single_shot
+        else qubit_params_module.readout_pulse_ss
+    )
     qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
     kernels = qubit_params_module.acquire_kernel
     qubit_pulse = (
@@ -73,9 +83,12 @@ def rabi_ge(
             else qubit_parameters["q0"]["qb_resolved_freq"]
         )
 
+    averaging_mode = AveragingMode.SINGLE_SHOT if single_shot else AveragingMode.CYCLIC
+
     with exp.acquire_loop_rt(
         uid="shots",
         count=pow(2, average_exponent),
+        averaging_mode=averaging_mode,
     ):
         with exp.sweep(
             uid="time_or_amp_sweep",
@@ -117,6 +130,7 @@ def rabi_ge(
         lo_settings,
         rotate_ro=rotate_ro,
         thresholds=thresholds,
+        single_shot=single_shot,
     )
     if qubit_drive_freq is not None:
         if not resolved:

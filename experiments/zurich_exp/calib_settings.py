@@ -97,6 +97,7 @@ def create_default_map_and_calibration(
     sb_SW_override=False,
     qb_drive_SW_override=False,
     qb_resolved_SW_override=False,
+    single_shot=False,
 ):
 
     los = lo_settings["q0"][serial_num]
@@ -255,6 +256,8 @@ def create_default_map_and_calibration(
         sig_freq_map[serial_num][ch]["measure/acquire"] = {}
         sig_freq_map[serial_num][ch]["measure/acquire"]["frequency"] = (
             qubit_parameters["q0"]["ro_freq"] - ro_lo
+            if not single_shot
+            else qubit_parameters["q0"]["ro_freq_ss"] - ro_lo
         )
         sig_freq_map[serial_num][ch]["measure/acquire"]["range"] = [
             qubit_parameters["q0"]["ro_drive_dBm_range"],
