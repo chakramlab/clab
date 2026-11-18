@@ -1,4 +1,9 @@
-from laboneq.simple import AcquisitionType, Experiment, ExperimentSignal
+from laboneq.simple import (
+    AcquisitionType,
+    Experiment,
+    ExperimentSignal,
+    LinearSweepParameter,
+)
 
 from .calib_settings import create_default_map_and_calibration
 from .laboneq_helper import default_signal_map_and_calibration
@@ -14,10 +19,10 @@ def sideband_pulse_train(
     swp_param=None,  # Expecting a SweepParameter tracking integer pulse counts
     alice_or_bob="alice",
     max_fock_state=1,
-    sb_freq=None,
+    sb_freq_sweep=None,
     sb_length=None,
     sb_range=None,
-    sb_amplitude=None,
+    sb_amplitude_sweep=None,
     acquisition_type=AcquisitionType.INTEGRATION,
     rotate_ro=False,
     thresholds=None,
@@ -50,15 +55,24 @@ def sideband_pulse_train(
         sb_length = (
             sb_f0g1_alice.length if alice_or_bob == "alice" else sb_f0g1_bob.length
         )
-    if sb_amplitude is not None:
-        if alice_or_bob == "alice":
-            sb_f0g1_alice.amplitude = 1
-        else:
-            sb_f0g1_bob.amplitude = 1
+
+    sb_drive_amplitude = (
+        sb_f0g1_alice.amplitude if alice_or_bob == "alice" else sb_f0g1_bob.amplitude
+    )
+    if alice_or_bob == "alice":
+        sb_f0g1_alice.amplitude = 1
+    else:
+        sb_f0g1_bob.amplitude = 1
+    if sb_amplitude_sweep is None:
+        sb_amplitude_sweep = LinearSweepParameter(
+            "amp_sweep", sb_drive_amplitude, sb_drive_amplitude, 1
+        )
+
     if sb_range is None:
         sb_range = qubit_parameters["q0"][f"sb_{alice_or_bob}_dBm_range"]
-    if sb_freq is None:
+    if sb_freq_sweep is None:
         sb_freq = qubit_parameters["q0"][f"sb_{alice_or_bob}_freqs"][0]
+        sb_freq_sweep = LinearSweepParameter("freq_sweep", sb_freq, sb_freq, 1)
 
     # Create Experiment
     exp = Experiment(
@@ -77,70 +91,88 @@ def sideband_pulse_train(
     ):
 
         with exp.sweep(
-            uid="pulse_count_sweep",
-            parameter=swp_param,
+            uid="freq_sweep",
+            parameter=sb_freq_sweep,
             reset_oscillator_phase=True,
             chunk_count=chunk_count,
         ):
 
-            with exp.section(
-                uid="ge_excitation",
-                play_after=None,
+            with exp.sweep(
+                uid="amp_sweep",
+                parameter=sb_amplitude_sweep,
+                reset_oscillator_phase=True,
+                chunk_count=chunk_count,
             ):
-                exp.play(
-                    signal=qb_drive_signal,
-                    pulse=ge_X180,
-                )
 
-            with exp.section(
-                uid="ef_excitation", play_after="ge_excitation", on_system_grid=True
-            ):
-                exp.play(
-                    signal=qb_ef_drive_signal,
-                    pulse=ef_X180,
-                )
+                with exp.sweep(
+                    uid="pulse_count_sweep",
+                    parameter=swp_param,
+                    reset_oscillator_phase=True,
+                    chunk_count=chunk_count,
+                ):
 
-            with exp.section(uid="sb_transition_f0g1", play_after="ef_excitation"):
-                with exp.match(sweep_parameter=swp_param):
-                    for n in swp_param.values:
-                        n_int = int(n)
-                        with exp.case(n_int):
-                            for _ in range(n_int):
-                                exp.play(
-                                    signal=sb_drive_lines["f0g1"],
-                                    pulse=(
-                                        sb_f0g1_alice
-                                        if alice_or_bob == "alice"
-                                        else sb_f0g1_bob
-                                    ),
-                                    amplitude=sb_amplitude,
-                                )
+                    with exp.section(
+                        uid="ge_excitation",
+                        play_after=None,
+                    ):
+                        exp.play(
+                            signal=qb_drive_signal,
+                            pulse=ge_X180,
+                        )
 
-            with exp.section(
-                uid="fe_excitation",
-                play_after="sb_transition_f0g1",
-                # on_system_grid=True,
-            ):
-                exp.play(
-                    signal=qb_ef_drive_signal,
-                    pulse=ef_X180,
-                )
-                # (
-                #     exp.delay(signal=qb_drive_signal, time=pulse_delay)
-                #     if _ < n_int - 1
-                #     else None
-                # )
+                    with exp.section(
+                        uid="ef_excitation",
+                        play_after="ge_excitation",
+                        on_system_grid=True,
+                    ):
+                        exp.play(
+                            signal=qb_ef_drive_signal,
+                            pulse=ef_X180,
+                        )
 
-            with exp.section(uid="readout", play_after="fe_excitation"):
-                exp.measure(
-                    measure_signal="measure",
-                    measure_pulse=readout_pulse,
-                    acquire_signal="acquire",
-                    integration_kernel=kernels,
-                    handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
-                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
-                )
+                    with exp.section(
+                        uid="sb_transition_f0g1", play_after="ef_excitation"
+                    ):
+                        with exp.match(sweep_parameter=swp_param):
+                            for n in swp_param.values:
+                                n_int = int(n)
+                                with exp.case(n_int):
+                                    for _ in range(n_int):
+                                        exp.play(
+                                            signal=sb_drive_lines["f0g1"],
+                                            pulse=(
+                                                sb_f0g1_alice
+                                                if alice_or_bob == "alice"
+                                                else sb_f0g1_bob
+                                            ),
+                                            amplitude=sb_amplitude_sweep,
+                                        )
+
+                    with exp.section(
+                        uid="fe_excitation",
+                        play_after="sb_transition_f0g1",
+                        # on_system_grid=True,
+                    ):
+                        exp.play(
+                            signal=qb_ef_drive_signal,
+                            pulse=ef_X180,
+                        )
+                        # (
+                        #     exp.delay(signal=qb_drive_signal, time=pulse_delay)
+                        #     if _ < n_int - 1
+                        #     else None
+                        # )
+
+                    with exp.section(uid="readout", play_after="fe_excitation"):
+                        exp.measure(
+                            measure_signal="measure",
+                            measure_pulse=readout_pulse,
+                            acquire_signal="acquire",
+                            integration_kernel=kernels,
+                            handle="ac_0",
+                            reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                            acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                        )
 
     # setup calibration and signal map for the experiment
     sig_freq_map = create_default_map_and_calibration(
@@ -156,7 +188,9 @@ def sideband_pulse_train(
     ch = "SG1"
     sig_freq_map[serial_num][ch] = {}
     sig_freq_map[serial_num][ch][sb_drive_lines["f0g1"]] = {}
-    sig_freq_map[serial_num][ch][sb_drive_lines["f0g1"]]["frequency"] = sb_freq - lo
+    sig_freq_map[serial_num][ch][sb_drive_lines["f0g1"]]["frequency"] = (
+        sb_freq_sweep - lo
+    )
     sig_freq_map[serial_num][ch][sb_drive_lines["f0g1"]]["range"] = sb_range
 
     exp_calibration, map_q0 = default_signal_map_and_calibration(

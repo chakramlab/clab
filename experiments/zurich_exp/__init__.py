@@ -88,8 +88,10 @@ from .sideband_spectroscopy import sideband_spectroscopy
 from .sideband_spectroscopy_snail_flux_transformer import (
     sideband_spectroscopy_snail_flux_transformer,
 )
+from .sideband_t1_snail_flux_transformer import sideband_t1_snail_flux_transformer
 from .sideband_then_resolved_rabi import resolved_rabi_with_sideband
 from .snail_buffer_cross_kerr import snail_buffer_cross_kerr
+from .snail_mode_cross_kerr import snail_mode_cross_kerr
 from .snail_rabi import snail_rabi
 from .snail_rabi_subharmonic import snail_rabi_subharmonic
 from .snail_ramsey import snail_ramsey

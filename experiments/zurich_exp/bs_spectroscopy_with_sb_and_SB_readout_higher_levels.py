@@ -205,7 +205,11 @@ def bs_spectroscopy_with_sb_and_SB_readout_higher_levels(
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                    reset_delay=(
+                        qubit_parameters["q0"]["cavity_reset_delay"]
+                        if storage_mode != 0
+                        else 5 * 2 * qubit_parameters["q0"]["snail_01_t1"]
+                    ),
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 
