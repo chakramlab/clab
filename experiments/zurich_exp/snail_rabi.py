@@ -24,7 +24,8 @@ def snail_rabi(
     rotate_ro=False,
     thresholds=None,
     chunk_count=1,
-    averaging_mode=AveragingMode.CYCLIC,
+    single_shot=False,
+    by2=False,
 ):
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
@@ -33,16 +34,27 @@ def snail_rabi(
     kernels = qubit_params_module.acquire_kernel
     bs = qubit_params_module.bs_transmon_snail_eg_ge
     bs_freq = qubit_parameters["q0"]["bs_transmon_snail_eg_ge_freq"]
-    snail_pulse = qubit_params_module.snail_01_X180
+    snail_pulse = (
+        qubit_params_module.snail_01_X180
+        if not by2
+        else qubit_params_module.snail_01_by2_X180
+    )
 
     if amplitude is not None:
         snail_pulse.amplitude = amplitude
 
-    snail_drive_freq = (
-        qubit_parameters["q0"]["snail_01_freq"]
-        if snail_drive_freq is None
-        else snail_drive_freq
+    snail_range = (
+        qubit_parameters["q0"]["snail_01_dBm_range"]
+        if not by2
+        else qubit_parameters["q0"]["snail_01_by2_dBm_range"]
     )
+
+    config_freq = (
+        qubit_parameters["q0"]["snail_01_freq"]
+        if not by2
+        else qubit_parameters["q0"]["snail_01_by2_freq"]
+    )
+    snail_drive_freq = config_freq if snail_drive_freq is None else snail_drive_freq
 
     for freq, lo_name in zip([snail_drive_freq, bs_freq], ["SG2_LO", "SG4_LO"]):
         lo_settings["q0"][serial_num][lo_name] = max(1e9, round(freq / 200e6) * 200e6)
@@ -58,6 +70,11 @@ def snail_rabi(
             ExperimentSignal("acquire"),
         ],
     )
+
+    if single_shot:
+        averaging_mode = AveragingMode.SINGLE_SHOT
+    else:
+        averaging_mode = AveragingMode.CYCLIC
 
     with exp.acquire_loop_rt(
         uid="shots",
@@ -98,7 +115,7 @@ def snail_rabi(
     )
     sig_freq_map[serial_num]["SG3"]["snail_drive"] = {
         "frequency": snail_drive_freq - lo_snail,
-        "range": qubit_parameters["q0"]["snail_01_dBm_range"],
+        "range": snail_range,
     }
     sig_freq_map[serial_num]["SG4"]["bs"] = {
         "frequency": bs_freq - lo_bs,

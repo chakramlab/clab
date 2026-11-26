@@ -1,0 +1,191 @@
+from laboneq.simple import (
+    AcquisitionType,
+    Experiment,
+    ExperimentSignal,
+    LinearSweepParameter,
+    pulse_library,
+)
+
+from .calib_settings import create_default_map_and_calibration
+from .laboneq_helper import default_signal_map_and_calibration
+from .load_qubit_params import load_qubit_params
+
+
+def snail_state_dependent_bs_rabi(
+    device_setup,
+    serial_num,
+    qubit_params_file_path,
+    exp_id="rabi",
+    average_exponent=5,  # 2^n averages, n=average_exponent, maximum: n = 17. You can modify the code to average for any integer number if needed.
+    swp_param=LinearSweepParameter(uid="swp_param", start=1e-9, stop=10e-6, count=6),
+    bs_freq=None,
+    bs_length=None,
+    bs_range=None,
+    bs_ramp=None,
+    bs_amplitude=None,
+    swp_amp=False,
+    acquisition_type=AcquisitionType.INTEGRATION,
+    alice_or_bob="alice",
+    max_fock_state=1,  # only works for 1 now
+    rotate_ro=False,
+    thresholds=None,
+    storage_mode=1,
+    sb_delay=0,
+    chunk_count=1,
+):
+
+    # Load device and config params
+    qubit_params_module = load_qubit_params(qubit_params_file_path)
+    lo_settings = qubit_params_module.create_lo_settings(serial_num)
+    readout_pulse = qubit_params_module.readout_pulse
+    qubit_parameters = qubit_params_module.__dict__["qubit_parameters"]
+    kernels = qubit_params_module.acquire_kernel
+    ge_X180 = qubit_params_module.ge_X180
+    ef_X180 = qubit_params_module.ef_X180
+    sb_f0g1_alice = qubit_params_module.sb_pulses["alice"]["f0g1"]
+    sb_f0g1_bob = qubit_params_module.sb_pulses["bob"]["f0g1"]
+    snail_pulse = qubit_params_module.snail_01_X180
+
+    bs = qubit_params_module.sb_pulses[alice_or_bob][f"bs{storage_mode}"]
+    if bs_length is None:
+        bs_length = bs.length
+    if bs_amplitude is not None:
+        bs.amplitude = 1
+    if bs_range is None:
+        bs_range = qubit_parameters["q0"][f"bs_{alice_or_bob}_dBm_ranges"][storage_mode]
+    if bs_freq is None:
+        bs_freq = qubit_parameters["q0"][f"bs_{alice_or_bob}_freqs"][storage_mode]
+    if bs_ramp is not None:
+        bs.pulse_parameters["ramp"] = bs_ramp
+
+    snail_drive_freq = qubit_parameters["q0"]["snail_01_freq"]
+
+    for freq, lo_name in zip([snail_drive_freq, bs_freq], ["SG2_LO", "SG4_LO"]):
+        lo_settings["q0"][serial_num][lo_name] = max(1e9, round(freq / 200e6) * 200e6)
+
+    lo_snail = lo_settings["q0"][serial_num]["SG2_LO"]
+    lo_bs = lo_settings["q0"][serial_num]["SG4_LO"]
+
+    if swp_amp:
+        bs_amplitude = swp_param
+    else:
+        bs_length = swp_param
+
+    transitions = [f"f{i}g{i + 1}" for i in range(max_fock_state)]
+    sb_drive_lines = {}
+    sb_drive_pulses = {}
+    for transition in transitions:
+        if alice_or_bob == "alice":
+            sb_drive_lines[transition] = f"sb_drive_alice_{transition}"
+        else:
+            sb_drive_lines[transition] = f"sb_drive_bob_{transition}"
+
+    # Create Experiment
+    exp = Experiment(
+        uid=exp_id,
+        signals=[
+            ExperimentSignal("qb_drive"),
+            ExperimentSignal("qb_ef_drive"),
+            *[ExperimentSignal(sb_drive_lines[_]) for _ in transitions],
+            ExperimentSignal("snail_drive"),
+            ExperimentSignal("bs"),
+            ExperimentSignal("measure"),
+            ExperimentSignal("acquire"),
+        ],
+    )
+    with exp.acquire_loop_rt(
+        uid="shots", count=pow(2, average_exponent), acquisition_type=acquisition_type
+    ):
+        with exp.sweep(
+            uid="time_or_amp_sweep", parameter=swp_param, reset_oscillator_phase=True
+        ):
+            with exp.section(uid="ge_excitation", play_after=None):
+                exp.play(signal="qb_drive", pulse=ge_X180)
+
+            with exp.section(
+                uid="ef_excitation_1", play_after="ge_excitation", on_system_grid=True
+            ):
+                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+
+            with exp.section(uid="sb_transition_f0g1_1", play_after="ef_excitation_1"):
+                exp.play(
+                    signal=sb_drive_lines["f0g1"],
+                    pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
+                )
+            with exp.section(uid="sb_delay_pre", play_after="sb_transition_f0g1_1"):
+                exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
+
+            with exp.section(uid="snail_excitation_1", play_after="sb_delay_pre"):
+                exp.play(signal="snail_drive", pulse=snail_pulse)
+
+            with exp.section(uid="bs", play_after="snail_excitation_1"):
+                exp.play(
+                    signal="bs",
+                    pulse=bs,
+                    length=bs_length,
+                    amplitude=bs_amplitude if bs_amplitude is not None else None,
+                )
+
+            with exp.section(uid="snail_excitation_2", play_after="bs"):
+                exp.play(signal="snail_drive", pulse=snail_pulse)
+
+            with exp.section(uid="sb_delay_post", play_after="snail_excitation_2"):
+                exp.delay(signal=sb_drive_lines["f0g1"], time=sb_delay)
+
+            with exp.section(uid="sb_transition_f0g1_2", play_after="sb_delay_post"):
+                exp.play(
+                    signal=sb_drive_lines["f0g1"],
+                    pulse=sb_f0g1_alice if alice_or_bob == "alice" else sb_f0g1_bob,
+                )
+
+            with exp.section(
+                uid="ef_excitation_2",
+                play_after="sb_transition_f0g1_2",
+                on_system_grid=True,
+            ):
+                exp.play(signal="qb_ef_drive", pulse=ef_X180)
+
+            with exp.section(uid="readout", play_after="ef_excitation_2"):
+                exp.measure(
+                    measure_signal="measure",
+                    measure_pulse=readout_pulse,
+                    acquire_signal="acquire",
+                    integration_kernel=kernels,
+                    handle="ac_0",
+                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                    acquire_delay=qubit_parameters["q0"]["acquire_delay"],
+                )
+
+    # setup calibration and signal map for the experiment
+    sig_freq_map = create_default_map_and_calibration(
+        exp,
+        serial_num,
+        qubit_parameters,
+        lo_settings,
+        rotate_ro=rotate_ro,
+        thresholds=thresholds,
+    )
+
+    ch = "SG4"
+    sig_freq_map[serial_num][ch]["bs"] = {}
+    sig_freq_map[serial_num][ch]["bs"]["frequency"] = bs_freq - lo_bs
+    sig_freq_map[serial_num][ch]["bs"]["range"] = bs_range
+
+    snail_range = qubit_parameters["q0"]["snail_01_dBm_range"]
+    sig_freq_map[serial_num]["SG3"]["snail_drive"] = {
+        "frequency": snail_drive_freq - lo_snail,
+        "range": snail_range,
+    }
+
+    exp_calibration, map_q0 = default_signal_map_and_calibration(
+        sig_freq_map,
+        {
+            "device_setup": device_setup,
+            "lo_settings": lo_settings,
+            "qubit_parameters": qubit_parameters,
+        },
+    )
+    exp.set_calibration(exp_calibration)
+    exp.set_signal_map(map_q0)
+
+    return exp, lo_bs

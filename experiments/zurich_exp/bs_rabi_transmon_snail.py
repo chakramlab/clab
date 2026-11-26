@@ -117,7 +117,7 @@ def bs_transmon_snail_rabi(
                     integration_kernel=kernels,
                     handle="ac_0",
                     reset_delay=(
-                        qubit_parameters["q0"]["cavity_reset_delay"]
+                        qubit_parameters["q0"]["reset_delay"]
                         if reset_delay is None
                         else reset_delay
                     ),

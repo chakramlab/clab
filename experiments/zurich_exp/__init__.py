@@ -19,6 +19,7 @@ from .bs_rabi_with_sb_and_SB_readout import bs_rabi_with_sb_and_SB_readout
 from .bs_rabi_with_sb_and_SB_readout_higher_levels import (
     bs_rabi_with_sb_and_SB_readout_higher_levels,
 )
+from .bs_rabi_with_snail_dumps import bs_rabi_with_snail_dumps
 from .bs_ramsey_echo import bs_ramsey_echo
 from .bs_ramsey_snail_via_ST_beamsplitter import bs_ramsey_snail_via_ST_beamsplitter
 from .bs_ramsey_transmon_storage import bs_ramsey_transmon_storage
@@ -39,6 +40,7 @@ from .bs_spectroscopy_with_sb_and_SB_readout_higher_levels import (
 from .bs_spectroscopy_with_sb_but_resolved_readout import (
     bs_spectroscopy_with_sb_but_resolved_readout,
 )
+from .bs_spectroscopy_with_snail_dumps import bs_spectroscopy_with_snail_dumps
 from .bs_t1_test import bs_t1_test
 from .bs_t1_transmon_storage import bs_t1_transmon_storage
 from .bs_t1_transmon_storage_with_heating import bs_t1_transmon_storage_with_heating
@@ -88,8 +90,13 @@ from .sideband_spectroscopy import sideband_spectroscopy
 from .sideband_spectroscopy_snail_flux_transformer import (
     sideband_spectroscopy_snail_flux_transformer,
 )
+from .sideband_spectroscopy_with_snail_dumps import (
+    sideband_spectroscopy_with_snail_dumps,
+)
 from .sideband_t1_snail_flux_transformer import sideband_t1_snail_flux_transformer
 from .sideband_then_resolved_rabi import resolved_rabi_with_sideband
+from .snail_12_rabi import snail_12_rabi
+from .snail_12_spectroscopy import snail_12_spectroscopy
 from .snail_buffer_cross_kerr import snail_buffer_cross_kerr
 from .snail_mode_cross_kerr import snail_mode_cross_kerr
 from .snail_rabi import snail_rabi
@@ -98,6 +105,12 @@ from .snail_ramsey import snail_ramsey
 from .snail_ramsey_subharmonic import snail_ramsey_subharmonic
 from .snail_spectroscopy import snail_spectroscopy
 from .snail_spectroscopy_subharmonic import snail_spectroscopy_subharmonic
+from .snail_state_dependent_bs_rabi import snail_state_dependent_bs_rabi
+from .snail_state_dependent_bs_spectroscopy import snail_state_dependent_bs_spectroscopy
+from .snail_storage_beamsplitter_rabi import snail_storage_beamsplitter_rabi
+from .snail_storage_beamsplitter_spectroscopy import (
+    snail_storage_beamsplitter_spectroscopy,
+)
 from .snail_t1 import snail_t1
 from .snail_t1_subharmonic import snail_t1_subharmonic
 from .snail_thermal_population_after_bs_drive_with_transmonalice_storage_bs import (

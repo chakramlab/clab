@@ -223,6 +223,12 @@ def sideband_t1_snail_flux_transformer(
                     amplitude=sb_amplitude if sb_amplitude is not None else None,
                 )
                 exp.delay(signal="dump", time=swp_param)
+                exp.play(
+                    signal="dump",
+                    pulse=dump,
+                    length=sb_length,
+                    amplitude=sb_amplitude if sb_amplitude is not None else None,
+                )
 
             with exp.section(
                 uid="snail_drive2", play_after="dump", on_system_grid=True

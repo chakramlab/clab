@@ -114,7 +114,7 @@ def bs_spectroscopy_transmon_snail(
                     acquire_signal="acquire",
                     integration_kernel=kernels,
                     handle="ac_0",
-                    reset_delay=qubit_parameters["q0"]["cavity_reset_delay"],
+                    reset_delay=qubit_parameters["q0"]["reset_delay"],
                     acquire_delay=qubit_parameters["q0"]["acquire_delay"],
                 )
 

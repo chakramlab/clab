@@ -27,6 +27,7 @@ def snail_spectroscopy(
     thresholds=None,
     chunk_count=1,
     averaging_mode=AveragingMode.CYCLIC,
+    by2=False,
 ):
     qubit_params_module = load_qubit_params(qubit_params_file_path)
     lo_settings = qubit_params_module.create_lo_settings(serial_num)
@@ -37,7 +38,17 @@ def snail_spectroscopy(
     bs_freq = qubit_parameters["q0"]["bs_transmon_snail_eg_ge_freq"]
 
     snail_freq = (min(freq_swp.values) + max(freq_swp.values)) / 2
-    snail_pulse = qubit_params_module.snail_01_X180
+    snail_pulse = (
+        qubit_params_module.snail_01_X180
+        if not by2
+        else qubit_params_module.snail_01_by2_X180
+    )
+
+    snail_range = (
+        qubit_parameters["q0"]["snail_01_dBm_range"]
+        if not by2
+        else qubit_parameters["q0"]["snail_01_by2_dBm_range"]
+    )
 
     if length is not None:
         snail_pulse.length = length
@@ -102,7 +113,7 @@ def snail_spectroscopy(
     )
     sig_freq_map[serial_num]["SG3"]["snail_drive"] = {
         "frequency": freq_swp,
-        "range": qubit_parameters["q0"]["snail_01_dBm_range"],
+        "range": snail_range,
     }
     sig_freq_map[serial_num]["SG4"]["bs"] = {
         "frequency": bs_freq - lo_bs,
